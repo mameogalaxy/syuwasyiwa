@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>手話ミラー / Shuwa Mirror</title>
+  <meta name="description" content="Webカメラで自分の手を鏡のように映し、手指トラッキングと指文字リファレンスで手話を練習できるツール。" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="app-header">
+    <h1>手話ミラー <span class="subtitle">Shuwa Mirror</span></h1>
+    <p class="tagline">カメラに映る自分の手を鏡のように見ながら、手話・指文字を練習しよう。</p>
+  </header>
+
+  <main class="layout">
+    <section class="stage" aria-label="カメラビュー">
+      <div class="video-wrap" id="videoWrap">
+        <video id="video" playsinline muted></video>
+        <canvas id="overlay"></canvas>
+        <div class="stage-message" id="stageMessage">
+          <p>「カメラを開始」を押すと、ここに映像が表示されます。</p>
+          <p class="muted">映像はあなたの端末内だけで処理され、どこにも送信されません。</p>
+        </div>
+      </div>
+
+      <div class="controls" role="toolbar" aria-label="操作">
+        <button id="startBtn" class="btn primary">▶ カメラを開始</button>
+        <button id="stopBtn" class="btn" disabled>■ 停止</button>
+        <label class="toggle">
+          <input type="checkbox" id="mirrorToggle" checked />
+          鏡像
+        </label>
+        <label class="toggle">
+          <input type="checkbox" id="landmarkToggle" checked />
+          手のスケルトン
+        </label>
+        <button id="snapshotBtn" class="btn" disabled>📷 スナップショット</button>
+      </div>
+
+      <div class="readout" id="readout" aria-live="polite">
+        <span class="status-dot" id="statusDot"></span>
+        <span id="statusText">待機中</span>
+      </div>
+    </section>
+
+    <aside class="panel" aria-label="指文字リファレンス">
+      <h2>指文字リファレンス</h2>
+      <p class="panel-hint">カードを選ぶと手の形の説明が出ます。鏡を見ながら同じ形を作ってみましょう。</p>
+
+      <div class="char-grid" id="charGrid"></div>
+
+      <div class="detail" id="charDetail" hidden>
+        <div class="detail-glyph" id="detailGlyph">あ</div>
+        <div class="detail-body">
+          <h3 id="detailReading">あ</h3>
+          <p id="detailDesc"></p>
+        </div>
+      </div>
+
+      <div class="practice" id="practiceBox" hidden>
+        <h3>検出結果</h3>
+        <ul class="hand-stats" id="handStats">
+          <li>手は検出されていません。</li>
+        </ul>
+      </div>
+    </aside>
+  </main>
+
+  <footer class="app-footer">
+    <p>
+      手指トラッキングは <a href="https://developers.google.com/mediapipe" target="_blank" rel="noopener">MediaPipe</a> を利用しています。
+      映像はブラウザ内で処理され、サーバーへ送信されません。
+    </p>
+    <p class="muted">指文字の説明は練習の手がかりです。正確な形は地域や手話通訳者によって異なる場合があります。</p>
+  </footer>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>
