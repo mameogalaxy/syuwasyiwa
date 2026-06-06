@@ -4,76 +4,102 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>手話ミラー / Shuwa Mirror</title>
-  <meta name="description" content="Webカメラで自分の手を鏡のように映し、手指トラッキングと指文字リファレンスで手話を練習できるツール。" />
+  <meta name="description" content="お題に合わせて指文字を1つずつ練習し、テストで覚えられる手話学習アプリ。カメラの手指トラッキングで自分の手を鏡のように確認できます。" />
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
-  <header class="app-header">
-    <h1>手話ミラー <span class="subtitle">Shuwa Mirror</span></h1>
-    <p class="tagline">カメラに映る自分の手を鏡のように見ながら、手話・指文字を練習しよう。</p>
-  </header>
+  <!-- ====== ホーム ====== -->
+  <section class="screen home active" id="homeScreen">
+    <div class="home-inner">
+      <div class="hero-badge">📚 ゆびもじ れんしゅう</div>
+      <h1 class="home-title">手話ミラー</h1>
+      <p class="home-sub">お題にあわせて手をうごかして、ゆびもじを おぼえよう！</p>
 
-  <main class="layout">
-    <section class="stage" aria-label="カメラビュー">
-      <div class="video-wrap" id="videoWrap">
-        <video id="video" playsinline muted></video>
-        <canvas id="overlay"></canvas>
-        <div class="stage-message" id="stageMessage">
-          <p>「カメラを開始」を押すと、ここに映像が表示されます。</p>
-          <p class="muted">映像はあなたの端末内だけで処理され、どこにも送信されません。</p>
+      <div class="progress-card">
+        <div class="progress-card-row">
+          <span>おぼえた ゆびもじ</span>
+          <span class="progress-count"><strong id="learnedCount">0</strong> / <span id="totalCount">0</span></span>
+        </div>
+        <div class="bar"><div class="bar-fill" id="homeBar"></div></div>
+      </div>
+
+      <div class="home-actions">
+        <button class="big-btn lesson" id="startLessonBtn">
+          <span class="big-btn-emoji">✏️</span>
+          <span class="big-btn-label">レッスン</span>
+          <span class="big-btn-note">1つずつ おぼえる</span>
+        </button>
+        <button class="big-btn test" id="startTestBtn">
+          <span class="big-btn-emoji">🏅</span>
+          <span class="big-btn-label">テスト</span>
+          <span class="big-btn-note">力だめし</span>
+        </button>
+      </div>
+
+      <p class="home-foot">カメラの映像はあなたの端末の中だけで使われ、どこにも送信されません。</p>
+    </div>
+  </section>
+
+  <!-- ====== 学習（レッスン／テスト共通） ====== -->
+  <section class="screen study" id="studyScreen">
+    <header class="study-bar">
+      <button class="icon-btn" id="exitBtn" aria-label="ホームへもどる">✕</button>
+      <div class="study-bar-center">
+        <span class="mode-chip" id="modeChip">レッスン</span>
+        <span class="progress-text" id="progressText">1 / 15</span>
+      </div>
+      <span class="score-chip" id="scoreChip" hidden>⭐ 0</span>
+    </header>
+
+    <div class="bar study-progress"><div class="bar-fill" id="studyBar"></div></div>
+
+    <div class="study-body">
+      <!-- お題 -->
+      <div class="prompt-card">
+        <p class="prompt-lead" id="promptLead">この形を 手で つくってみよう</p>
+        <div class="glyph" id="glyph">あ</div>
+        <div class="reading" id="reading">a</div>
+        <div class="hint" id="hint">
+          <span class="hint-tag">ヒント</span>
+          <p id="hintText"></p>
         </div>
       </div>
 
-      <div class="controls" role="toolbar" aria-label="操作">
-        <button id="startBtn" class="btn primary">▶ カメラを開始</button>
-        <button id="stopBtn" class="btn" disabled>■ 停止</button>
-        <label class="toggle">
-          <input type="checkbox" id="mirrorToggle" checked />
-          鏡像
-        </label>
-        <label class="toggle">
-          <input type="checkbox" id="landmarkToggle" checked />
-          手のスケルトン
-        </label>
-        <button id="snapshotBtn" class="btn" disabled>📷 スナップショット</button>
-      </div>
-
-      <div class="readout" id="readout" aria-live="polite">
-        <span class="status-dot" id="statusDot"></span>
-        <span id="statusText">待機中</span>
-      </div>
-    </section>
-
-    <aside class="panel" aria-label="指文字リファレンス">
-      <h2>指文字リファレンス</h2>
-      <p class="panel-hint">カードを選ぶと手の形の説明が出ます。鏡を見ながら同じ形を作ってみましょう。</p>
-
-      <div class="char-grid" id="charGrid"></div>
-
-      <div class="detail" id="charDetail" hidden>
-        <div class="detail-glyph" id="detailGlyph">あ</div>
-        <div class="detail-body">
-          <h3 id="detailReading">あ</h3>
-          <p id="detailDesc"></p>
+      <!-- ミラー -->
+      <div class="mirror">
+        <div class="video-wrap mirrored" id="videoWrap">
+          <video id="video" playsinline muted></video>
+          <canvas id="overlay"></canvas>
+          <div class="stage-message" id="stageMessage">
+            <p>📷 カメラを準備しています…</p>
+          </div>
         </div>
+        <div class="finger-readout" id="fingerReadout">手をカメラにうつしてね</div>
       </div>
+    </div>
 
-      <div class="practice" id="practiceBox" hidden>
-        <h3>検出結果</h3>
-        <ul class="hand-stats" id="handStats">
-          <li>手は検出されていません。</li>
-        </ul>
+    <!-- 操作（モードで切り替え） -->
+    <footer class="study-controls" id="studyControls"></footer>
+  </section>
+
+  <!-- ====== 結果 ====== -->
+  <section class="screen result" id="resultScreen">
+    <div class="result-inner">
+      <div class="result-emoji" id="resultEmoji">🎉</div>
+      <h2 class="result-title" id="resultTitle">よくできました！</h2>
+      <p class="result-score" id="resultScore"></p>
+      <div class="result-actions">
+        <button class="big-btn test" id="resultRetryBtn">
+          <span class="big-btn-emoji">🔁</span>
+          <span class="big-btn-label">もういちど</span>
+        </button>
+        <button class="big-btn home" id="resultHomeBtn">
+          <span class="big-btn-emoji">🏠</span>
+          <span class="big-btn-label">ホームへ</span>
+        </button>
       </div>
-    </aside>
-  </main>
-
-  <footer class="app-footer">
-    <p>
-      手指トラッキングは <a href="https://developers.google.com/mediapipe" target="_blank" rel="noopener">MediaPipe</a> を利用しています。
-      映像はブラウザ内で処理され、サーバーへ送信されません。
-    </p>
-    <p class="muted">指文字の説明は練習の手がかりです。正確な形は地域や手話通訳者によって異なる場合があります。</p>
-  </footer>
+    </div>
+  </section>
 
   <script type="module" src="app.js"></script>
 </body>

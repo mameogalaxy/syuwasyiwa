@@ -6,27 +6,82 @@ import {
 
 import { fingerspelling } from "./fingerspelling.js";
 
+// ===========================================================================
+// 要素参照
+// ===========================================================================
+const $ = (id) => document.getElementById(id);
+const screens = {
+  home: $("homeScreen"),
+  study: $("studyScreen"),
+  result: $("resultScreen"),
+};
 const els = {
-  videoWrap: document.getElementById("videoWrap"),
-  video: document.getElementById("video"),
-  overlay: document.getElementById("overlay"),
-  stageMessage: document.getElementById("stageMessage"),
-  startBtn: document.getElementById("startBtn"),
-  stopBtn: document.getElementById("stopBtn"),
-  snapshotBtn: document.getElementById("snapshotBtn"),
-  mirrorToggle: document.getElementById("mirrorToggle"),
-  landmarkToggle: document.getElementById("landmarkToggle"),
-  statusDot: document.getElementById("statusDot"),
-  statusText: document.getElementById("statusText"),
-  charGrid: document.getElementById("charGrid"),
-  charDetail: document.getElementById("charDetail"),
-  detailGlyph: document.getElementById("detailGlyph"),
-  detailReading: document.getElementById("detailReading"),
-  detailDesc: document.getElementById("detailDesc"),
-  practiceBox: document.getElementById("practiceBox"),
-  handStats: document.getElementById("handStats"),
+  learnedCount: $("learnedCount"),
+  totalCount: $("totalCount"),
+  homeBar: $("homeBar"),
+  startLessonBtn: $("startLessonBtn"),
+  startTestBtn: $("startTestBtn"),
+
+  exitBtn: $("exitBtn"),
+  modeChip: $("modeChip"),
+  progressText: $("progressText"),
+  scoreChip: $("scoreChip"),
+  studyBar: $("studyBar"),
+  promptLead: $("promptLead"),
+  glyph: $("glyph"),
+  reading: $("reading"),
+  hint: $("hint"),
+  hintText: $("hintText"),
+  studyControls: $("studyControls"),
+
+  videoWrap: $("videoWrap"),
+  video: $("video"),
+  overlay: $("overlay"),
+  stageMessage: $("stageMessage"),
+  fingerReadout: $("fingerReadout"),
+
+  resultEmoji: $("resultEmoji"),
+  resultTitle: $("resultTitle"),
+  resultScore: $("resultScore"),
+  resultRetryBtn: $("resultRetryBtn"),
+  resultHomeBtn: $("resultHomeBtn"),
 };
 
+// ===========================================================================
+// 進捗の保存（おぼえた指文字）
+// ===========================================================================
+const LEARNED_KEY = "shuwa-mirror-learned";
+
+function loadLearned() {
+  try {
+    return new Set(JSON.parse(localStorage.getItem(LEARNED_KEY) || "[]"));
+  } catch {
+    return new Set();
+  }
+}
+function saveLearned(set) {
+  localStorage.setItem(LEARNED_KEY, JSON.stringify([...set]));
+}
+let learned = loadLearned();
+
+function refreshHome() {
+  els.totalCount.textContent = fingerspelling.length;
+  els.learnedCount.textContent = learned.size;
+  const pct = Math.round((learned.size / fingerspelling.length) * 100);
+  els.homeBar.style.width = pct + "%";
+}
+
+// ===========================================================================
+// 画面切り替え
+// ===========================================================================
+function showScreen(name) {
+  Object.values(screens).forEach((s) => s.classList.remove("active"));
+  screens[name].classList.add("active");
+}
+
+// ===========================================================================
+// カメラ + 手指トラッキング
+// ===========================================================================
 const ctx = els.overlay.getContext("2d");
 let handLandmarker = null;
 let drawingUtils = null;
@@ -34,49 +89,11 @@ let stream = null;
 let rafId = null;
 let lastVideoTime = -1;
 
-// ---- Status helpers -------------------------------------------------------
-
-function setStatus(text, state = "") {
-  els.statusText.textContent = text;
-  els.statusDot.className = "status-dot" + (state ? " " + state : "");
-}
-
-// ---- Fingerspelling reference UI -----------------------------------------
-
-function buildCharGrid() {
-  fingerspelling.forEach((item, index) => {
-    const btn = document.createElement("button");
-    btn.className = "char-btn";
-    btn.textContent = item.char;
-    btn.setAttribute("aria-label", `${item.char} (${item.reading})`);
-    btn.addEventListener("click", () => selectChar(index, btn));
-    els.charGrid.appendChild(btn);
-  });
-}
-
-function selectChar(index, btn) {
-  document
-    .querySelectorAll(".char-btn.active")
-    .forEach((b) => b.classList.remove("active"));
-  btn.classList.add("active");
-
-  const item = fingerspelling[index];
-  els.detailGlyph.textContent = item.char;
-  els.detailReading.textContent = `${item.char}（${item.reading}）`;
-  els.detailDesc.textContent = item.desc;
-  els.charDetail.hidden = false;
-}
-
-// ---- MediaPipe setup ------------------------------------------------------
-
 async function ensureLandmarker() {
-  if (handLandmarker) return handLandmarker;
-  setStatus("手指トラッキングを読み込み中…", "loading");
-
+  if (handLandmarker) return;
   const vision = await FilesetResolver.forVisionTasks(
     "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm"
   );
-
   handLandmarker = await HandLandmarker.createFromOptions(vision, {
     baseOptions: {
       modelAssetPath:
@@ -86,45 +103,33 @@ async function ensureLandmarker() {
     runningMode: "VIDEO",
     numHands: 2,
   });
-
   drawingUtils = new DrawingUtils(ctx);
-  return handLandmarker;
 }
 
-// ---- Camera ---------------------------------------------------------------
-
 async function startCamera() {
-  els.startBtn.disabled = true;
+  if (stream) return; // すでに起動中
+  els.stageMessage.style.display = "flex";
+  els.stageMessage.innerHTML = "<p>📷 カメラを準備しています…</p>";
   try {
     await ensureLandmarker();
-    setStatus("カメラへのアクセスを許可してください…", "loading");
-
     stream = await navigator.mediaDevices.getUserMedia({
-      video: { width: { ideal: 1280 }, height: { ideal: 960 }, facingMode: "user" },
+      video: { width: { ideal: 960 }, height: { ideal: 1280 }, facingMode: "user" },
       audio: false,
     });
-
     els.video.srcObject = stream;
     await els.video.play();
-
     els.overlay.width = els.video.videoWidth;
     els.overlay.height = els.video.videoHeight;
-
     els.stageMessage.style.display = "none";
-    els.stopBtn.disabled = false;
-    els.snapshotBtn.disabled = false;
-    els.practiceBox.hidden = false;
-    setStatus("ライブ中 — 手をカメラに向けてみましょう", "live");
-
     renderLoop();
   } catch (err) {
     console.error(err);
-    els.startBtn.disabled = false;
     const msg =
       err && err.name === "NotAllowedError"
-        ? "カメラの使用が許可されませんでした。"
-        : "カメラまたはモデルの読み込みに失敗しました。";
-    setStatus(msg, "error");
+        ? "カメラの使用がきょかされませんでした。<br>ブラウザの設定でカメラをONにしてね。"
+        : "カメラまたはモデルの読みこみに失敗しました。<br>ネット接続をたしかめてね。";
+    els.stageMessage.innerHTML = `<p>${msg}</p>`;
+    els.fingerReadout.textContent = "カメラなしでも、お題を見ながら練習できます";
   }
 }
 
@@ -136,49 +141,38 @@ function stopCamera() {
     stream = null;
   }
   els.video.srcObject = null;
-  ctx.clearRect(0, 0, els.overlay.width, els.overlay.height);
-  els.stageMessage.style.display = "flex";
-  els.startBtn.disabled = false;
-  els.stopBtn.disabled = true;
-  els.snapshotBtn.disabled = true;
-  els.practiceBox.hidden = true;
   lastVideoTime = -1;
-  setStatus("停止しました", "");
+  ctx.clearRect(0, 0, els.overlay.width, els.overlay.height);
 }
-
-// ---- Detection loop -------------------------------------------------------
 
 function renderLoop() {
   rafId = requestAnimationFrame(renderLoop);
   if (!handLandmarker || els.video.readyState < 2) return;
-
   if (els.video.currentTime !== lastVideoTime) {
     lastVideoTime = els.video.currentTime;
     const result = handLandmarker.detectForVideo(els.video, performance.now());
     drawResult(result);
-    updateHandStats(result);
+    updateFingerReadout(result);
   }
 }
 
 function drawResult(result) {
   ctx.clearRect(0, 0, els.overlay.width, els.overlay.height);
-  if (!els.landmarkToggle.checked || !result.landmarks) return;
-
+  if (!result.landmarks) return;
   for (const landmarks of result.landmarks) {
     drawingUtils.drawConnectors(landmarks, HandLandmarker.HAND_CONNECTIONS, {
-      color: "#36d1a6",
-      lineWidth: 4,
+      color: "#38c47a",
+      lineWidth: 5,
     });
     drawingUtils.drawLandmarks(landmarks, {
-      color: "#4f8cff",
+      color: "#ff8a3d",
       lineWidth: 1,
-      radius: 4,
+      radius: 5,
     });
   }
 }
 
-// ---- Hand statistics (extended-finger count) ------------------------------
-
+// 伸びている指の本数（練習の手がかり表示）
 const FINGERS = [
   { name: "親指", tip: 4, pip: 2 },
   { name: "人差し指", tip: 8, pip: 6 },
@@ -187,98 +181,228 @@ const FINGERS = [
   { name: "小指", tip: 20, pip: 18 },
 ];
 
-function countExtendedFingers(landmarks) {
+function countExtended(landmarks) {
   const wrist = landmarks[0];
   let count = 0;
-  const extended = [];
   for (const f of FINGERS) {
     const tip = landmarks[f.tip];
     const pip = landmarks[f.pip];
-    let isUp;
+    let up;
     if (f.name === "親指") {
-      // 親指は手首からの距離で開閉を推定（向きに依存しにくい）。
       const dTip = Math.hypot(tip.x - wrist.x, tip.y - wrist.y);
       const dPip = Math.hypot(pip.x - wrist.x, pip.y - wrist.y);
-      isUp = dTip > dPip * 1.1;
+      up = dTip > dPip * 1.1;
     } else {
-      // 指先がPIP関節より上（y小さい）なら伸びていると判定。
-      isUp = tip.y < pip.y;
+      up = tip.y < pip.y;
     }
-    if (isUp) {
-      count++;
-      extended.push(f.name);
-    }
+    if (up) count++;
   }
-  return { count, extended };
+  return count;
 }
 
-function updateHandStats(result) {
+function updateFingerReadout(result) {
   const hands = result.landmarks || [];
   if (hands.length === 0) {
-    els.handStats.innerHTML = "<li>手は検出されていません。</li>";
+    els.fingerReadout.textContent = "✋ 手をカメラにうつしてね";
     return;
   }
-
-  const rows = hands.map((landmarks, i) => {
-    const label = result.handedness?.[i]?.[0]?.categoryName === "Left" ? "左手" : "右手";
-    const { count, extended } = countExtendedFingers(landmarks);
-    const detail = extended.length ? extended.join("・") : "握り";
-    return `<li class="hand-row"><span>${label}</span><span class="fingers">${count}本 (${detail})</span></li>`;
-  });
-
-  els.handStats.innerHTML = rows.join("");
+  const total = hands.reduce((sum, lm) => sum + countExtended(lm), 0);
+  els.fingerReadout.textContent = `指がのびている本数：${total}本`;
 }
 
-// ---- Snapshot -------------------------------------------------------------
+// ===========================================================================
+// レッスン／テストの進行
+// ===========================================================================
+const state = {
+  mode: "lesson", // 'lesson' | 'test'
+  queue: [],
+  pos: 0,
+  score: 0,
+  revealed: false,
+};
 
-function takeSnapshot() {
-  const w = els.video.videoWidth;
-  const h = els.video.videoHeight;
-  if (!w || !h) return;
-
-  const canvas = document.createElement("canvas");
-  canvas.width = w;
-  canvas.height = h;
-  const c = canvas.getContext("2d");
-
-  if (els.mirrorToggle.checked) {
-    c.translate(w, 0);
-    c.scale(-1, 1);
+function shuffled(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
   }
-  c.drawImage(els.video, 0, 0, w, h);
-  if (els.landmarkToggle.checked) {
-    c.drawImage(els.overlay, 0, 0, w, h);
+  return a;
+}
+
+function startLesson() {
+  state.mode = "lesson";
+  state.queue = fingerspelling.map((_, i) => i); // 順番どおり
+  state.pos = 0;
+  state.score = 0;
+  enterStudy();
+}
+
+function startTest() {
+  state.mode = "test";
+  state.queue = shuffled(fingerspelling.map((_, i) => i)); // ランダム
+  state.pos = 0;
+  state.score = 0;
+  enterStudy();
+}
+
+function enterStudy() {
+  showScreen("study");
+  startCamera();
+  renderStudy();
+}
+
+function exitStudy() {
+  stopCamera();
+  refreshHome();
+  showScreen("home");
+}
+
+function currentItem() {
+  return fingerspelling[state.queue[state.pos]];
+}
+
+function renderStudy() {
+  const item = currentItem();
+  const isTest = state.mode === "test";
+
+  els.modeChip.textContent = isTest ? "テスト" : "レッスン";
+  els.modeChip.classList.toggle("test", isTest);
+  els.progressText.textContent = `${state.pos + 1} / ${state.queue.length}`;
+  els.studyBar.style.width =
+    Math.round((state.pos / state.queue.length) * 100) + "%";
+
+  els.scoreChip.hidden = !isTest;
+  els.scoreChip.textContent = `⭐ ${state.score}`;
+
+  els.glyph.textContent = item.char;
+  els.reading.textContent = item.reading;
+
+  state.revealed = false;
+
+  if (isTest) {
+    // テスト：最初はヒントを隠す
+    els.promptLead.textContent = "この文字を 手で つくってみよう";
+    els.hint.hidden = true;
+    els.hintText.textContent = item.desc;
+  } else {
+    // レッスン：ヒントを見ながら練習
+    els.promptLead.textContent = "この形を まねしてみよう";
+    els.hint.hidden = false;
+    els.hintText.textContent = item.desc;
   }
 
-  canvas.toBlob((blob) => {
-    if (!blob) return;
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    const stamp = new Date().toISOString().replace(/[:.]/g, "-");
-    a.href = url;
-    a.download = `shuwa-mirror-${stamp}.png`;
-    a.click();
-    URL.revokeObjectURL(url);
-  }, "image/png");
+  renderControls();
 }
 
-// ---- Mirror toggle --------------------------------------------------------
+function renderControls() {
+  const c = els.studyControls;
+  c.innerHTML = "";
 
-function applyMirror() {
-  els.videoWrap.classList.toggle("mirrored", els.mirrorToggle.checked);
+  if (state.mode === "lesson") {
+    const back = button("← もどる", "ghost", prevItem);
+    back.disabled = state.pos === 0;
+    if (back.disabled) back.style.opacity = "0.4";
+    const next = button(
+      state.pos === state.queue.length - 1 ? "できた！ かんりょう 🎉" : "できた！ つぎへ →",
+      "go",
+      () => {
+        learned.add(currentItem().char);
+        saveLearned(learned);
+        advance();
+      }
+    );
+    c.append(back, next);
+  } else {
+    if (!state.revealed) {
+      // 答え合わせ前
+      c.append(button("答えを見る 👀", "reveal", revealAnswer));
+    } else {
+      // 自己採点
+      c.append(
+        button("まだ かな △", "maybe", () => grade(false)),
+        button("できた！ ◯", "go", () => grade(true))
+      );
+    }
+  }
 }
 
-// ---- Wire up --------------------------------------------------------------
+function button(label, cls, onClick) {
+  const b = document.createElement("button");
+  b.className = "ctrl-btn " + cls;
+  b.textContent = label;
+  b.addEventListener("click", onClick);
+  return b;
+}
 
-els.startBtn.addEventListener("click", startCamera);
-els.stopBtn.addEventListener("click", stopCamera);
-els.snapshotBtn.addEventListener("click", takeSnapshot);
-els.mirrorToggle.addEventListener("change", applyMirror);
+function revealAnswer() {
+  state.revealed = true;
+  els.hint.hidden = false;
+  els.promptLead.textContent = "答え合わせ：合っていたかな？";
+  renderControls();
+}
 
-buildCharGrid();
-applyMirror();
+function grade(correct) {
+  if (correct) {
+    state.score++;
+    learned.add(currentItem().char);
+    saveLearned(learned);
+  }
+  advance();
+}
+
+function prevItem() {
+  if (state.pos > 0) {
+    state.pos--;
+    renderStudy();
+  }
+}
+
+function advance() {
+  state.pos++;
+  if (state.pos >= state.queue.length) {
+    finishStudy();
+  } else {
+    renderStudy();
+  }
+}
+
+function finishStudy() {
+  stopCamera();
+  refreshHome();
+
+  if (state.mode === "lesson") {
+    els.resultEmoji.textContent = "🎉";
+    els.resultTitle.textContent = "ぜんぶ おぼえた！";
+    els.resultScore.innerHTML = `${state.queue.length}この ゆびもじを れんしゅうしたよ。<br>つぎは テストに ちょうせん！`;
+  } else {
+    const n = state.queue.length;
+    const s = state.score;
+    const ratio = s / n;
+    els.resultEmoji.textContent = ratio === 1 ? "🏆" : ratio >= 0.7 ? "🎉" : "💪";
+    els.resultTitle.textContent =
+      ratio === 1 ? "ぜんもん せいかい！" : ratio >= 0.7 ? "よくできました！" : "もうすこし！";
+    els.resultScore.innerHTML = `スコア：<strong>${s}</strong> / ${n}`;
+  }
+  showScreen("result");
+}
+
+// ===========================================================================
+// 配線
+// ===========================================================================
+els.startLessonBtn.addEventListener("click", startLesson);
+els.startTestBtn.addEventListener("click", startTest);
+els.exitBtn.addEventListener("click", exitStudy);
+els.resultHomeBtn.addEventListener("click", () => {
+  refreshHome();
+  showScreen("home");
+});
+els.resultRetryBtn.addEventListener("click", () => {
+  state.mode === "test" ? startTest() : startLesson();
+});
 
 if (!navigator.mediaDevices?.getUserMedia) {
-  setStatus("このブラウザはカメラに対応していません。", "error");
-  els.startBtn.disabled = true;
+  els.startLessonBtn.disabled = false; // カメラなしでも練習はできる
 }
+
+refreshHome();
