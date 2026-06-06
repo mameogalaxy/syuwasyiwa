@@ -4,20 +4,20 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>手話ミラー / Shuwa Mirror</title>
-  <meta name="description" content="お題に合わせて指文字を1つずつ練習し、テストで覚えられる手話学習アプリ。カメラの手指トラッキングで自分の手を鏡のように確認できます。" />
+  <meta name="description" content="お題の手話をお手本動画で見て、自分の手をカメラの鏡で確認しながら1つずつ覚えられる手話学習アプリ。レッスンとテストで身につきます。" />
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
   <!-- ====== ホーム ====== -->
   <section class="screen home active" id="homeScreen">
     <div class="home-inner">
-      <div class="hero-badge">📚 ゆびもじ れんしゅう</div>
+      <div class="hero-badge">🙌 手話を おぼえよう</div>
       <h1 class="home-title">手話ミラー</h1>
-      <p class="home-sub">お題にあわせて手をうごかして、ゆびもじを おぼえよう！</p>
+      <p class="home-sub">お手本を見て、自分の手を鏡でかくにん。1つずつ おぼえよう！</p>
 
       <div class="progress-card">
         <div class="progress-card-row">
-          <span>おぼえた ゆびもじ</span>
+          <span>おぼえた 手話</span>
           <span class="progress-count"><strong id="learnedCount">0</strong> / <span id="totalCount">0</span></span>
         </div>
         <div class="bar"><div class="bar-fill" id="homeBar"></div></div>
@@ -27,7 +27,7 @@
         <button class="big-btn lesson" id="startLessonBtn">
           <span class="big-btn-emoji">✏️</span>
           <span class="big-btn-label">レッスン</span>
-          <span class="big-btn-note">1つずつ おぼえる</span>
+          <span class="big-btn-note">お手本を見て まねる</span>
         </button>
         <button class="big-btn test" id="startTestBtn">
           <span class="big-btn-emoji">🏅</span>
@@ -36,7 +36,7 @@
         </button>
       </div>
 
-      <p class="home-foot">カメラの映像はあなたの端末の中だけで使われ、どこにも送信されません。</p>
+      <p class="home-foot">カメラの映像はあなたの端末の中だけで使われ、どこにも送信されません。<br>お手本は YouTube の参考動画です（手話は地域や人で表現が異なる場合があります）。</p>
     </div>
   </section>
 
@@ -46,7 +46,7 @@
       <button class="icon-btn" id="exitBtn" aria-label="ホームへもどる">✕</button>
       <div class="study-bar-center">
         <span class="mode-chip" id="modeChip">レッスン</span>
-        <span class="progress-text" id="progressText">1 / 15</span>
+        <span class="progress-text" id="progressText">1 / 13</span>
       </div>
       <span class="score-chip" id="scoreChip" hidden>⭐ 0</span>
     </header>
@@ -54,19 +54,32 @@
     <div class="bar study-progress"><div class="bar-fill" id="studyBar"></div></div>
 
     <div class="study-body">
-      <!-- お題 -->
-      <div class="prompt-card">
-        <p class="prompt-lead" id="promptLead">この形を 手で つくってみよう</p>
-        <div class="glyph" id="glyph">あ</div>
-        <div class="reading" id="reading">a</div>
-        <div class="hint" id="hint">
-          <span class="hint-tag">ヒント</span>
-          <p id="hintText"></p>
+      <div class="left-col">
+        <!-- お題 -->
+        <div class="prompt-card">
+          <span class="cat-chip" id="catChip">あいさつ</span>
+          <p class="prompt-lead" id="promptLead">この手話を やってみよう</p>
+          <div class="word" id="word">おはよう</div>
+          <div class="reading" id="reading">ohayō</div>
+        </div>
+
+        <!-- お手本 -->
+        <div class="sample" id="sample">
+          <div class="sample-head">
+            <span class="sample-tag">▶ お手本（参考動画）</span>
+            <a class="sample-search" id="sampleSearch" href="#" target="_blank" rel="noopener">ほかの動画を探す ↗</a>
+          </div>
+          <div class="sample-video" id="sampleVideo"><!-- iframe / リンクが入る --></div>
+          <div class="steps" id="steps">
+            <span class="steps-tag">うごきのヒント</span>
+            <p id="stepsText"></p>
+          </div>
         </div>
       </div>
 
       <!-- ミラー -->
       <div class="mirror">
+        <p class="mirror-label">🪞 あなたの手（鏡）</p>
         <div class="video-wrap mirrored" id="videoWrap">
           <video id="video" playsinline muted></video>
           <canvas id="overlay"></canvas>

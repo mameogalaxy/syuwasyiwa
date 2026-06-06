@@ -4,7 +4,7 @@ import {
   DrawingUtils,
 } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14";
 
-import { fingerspelling } from "./fingerspelling.js";
+import { signs } from "./signs.js";
 
 // ===========================================================================
 // 要素参照
@@ -27,12 +27,17 @@ const els = {
   progressText: $("progressText"),
   scoreChip: $("scoreChip"),
   studyBar: $("studyBar"),
+  catChip: $("catChip"),
   promptLead: $("promptLead"),
-  glyph: $("glyph"),
+  word: $("word"),
   reading: $("reading"),
-  hint: $("hint"),
-  hintText: $("hintText"),
   studyControls: $("studyControls"),
+
+  sample: $("sample"),
+  sampleSearch: $("sampleSearch"),
+  sampleVideo: $("sampleVideo"),
+  steps: $("steps"),
+  stepsText: $("stepsText"),
 
   videoWrap: $("videoWrap"),
   video: $("video"),
@@ -48,9 +53,9 @@ const els = {
 };
 
 // ===========================================================================
-// 進捗の保存（おぼえた指文字）
+// 進捗の保存（おぼえた手話）
 // ===========================================================================
-const LEARNED_KEY = "shuwa-mirror-learned";
+const LEARNED_KEY = "shuwa-mirror-learned-words";
 
 function loadLearned() {
   try {
@@ -65,9 +70,9 @@ function saveLearned(set) {
 let learned = loadLearned();
 
 function refreshHome() {
-  els.totalCount.textContent = fingerspelling.length;
+  els.totalCount.textContent = signs.length;
   els.learnedCount.textContent = learned.size;
-  const pct = Math.round((learned.size / fingerspelling.length) * 100);
+  const pct = Math.round((learned.size / signs.length) * 100);
   els.homeBar.style.width = pct + "%";
 }
 
@@ -77,6 +82,34 @@ function refreshHome() {
 function showScreen(name) {
   Object.values(screens).forEach((s) => s.classList.remove("active"));
   screens[name].classList.add("active");
+}
+
+// ===========================================================================
+// お手本動画
+// ===========================================================================
+function searchUrl(query) {
+  return "https://www.youtube.com/results?search_query=" + encodeURIComponent(query);
+}
+
+function setSample(item, show) {
+  els.sampleSearch.href = searchUrl(item.search);
+  if (!show) {
+    els.sampleVideo.innerHTML = ""; // 再生を止める
+    return;
+  }
+  if (item.video) {
+    els.sampleVideo.innerHTML =
+      `<iframe src="https://www.youtube-nocookie.com/embed/${item.video}?rel=0" ` +
+      `title="${item.word} のお手本" loading="lazy" ` +
+      `allow="accelerometer; encrypted-media; gyroscope; picture-in-picture" ` +
+      `allowfullscreen></iframe>`;
+  } else {
+    // 動画IDが無い単語は YouTube 検索を開くお手本ボタンにする
+    els.sampleVideo.innerHTML =
+      `<a class="sample-link" href="${searchUrl(item.search)}" target="_blank" rel="noopener">` +
+      `<span class="yt">▶</span><span>お手本動画を見る</span>` +
+      `<small>YouTube で「${item.search}」を開く</small></a>`;
+  }
 }
 
 // ===========================================================================
@@ -107,7 +140,7 @@ async function ensureLandmarker() {
 }
 
 async function startCamera() {
-  if (stream) return; // すでに起動中
+  if (stream) return;
   els.stageMessage.style.display = "flex";
   els.stageMessage.innerHTML = "<p>📷 カメラを準備しています…</p>";
   try {
@@ -129,7 +162,7 @@ async function startCamera() {
         ? "カメラの使用がきょかされませんでした。<br>ブラウザの設定でカメラをONにしてね。"
         : "カメラまたはモデルの読みこみに失敗しました。<br>ネット接続をたしかめてね。";
     els.stageMessage.innerHTML = `<p>${msg}</p>`;
-    els.fingerReadout.textContent = "カメラなしでも、お題を見ながら練習できます";
+    els.fingerReadout.textContent = "カメラなしでも、お手本を見て練習できます";
   }
 }
 
@@ -172,7 +205,6 @@ function drawResult(result) {
   }
 }
 
-// 伸びている指の本数（練習の手がかり表示）
 const FINGERS = [
   { name: "親指", tip: 4, pip: 2 },
   { name: "人差し指", tip: 8, pip: 6 },
@@ -207,7 +239,8 @@ function updateFingerReadout(result) {
     return;
   }
   const total = hands.reduce((sum, lm) => sum + countExtended(lm), 0);
-  els.fingerReadout.textContent = `指がのびている本数：${total}本`;
+  const handLabel = hands.length === 2 ? "両手" : "片手";
+  els.fingerReadout.textContent = `${handLabel}を けんしゅつ中／指 ${total}本`;
 }
 
 // ===========================================================================
@@ -232,7 +265,7 @@ function shuffled(arr) {
 
 function startLesson() {
   state.mode = "lesson";
-  state.queue = fingerspelling.map((_, i) => i); // 順番どおり
+  state.queue = signs.map((_, i) => i);
   state.pos = 0;
   state.score = 0;
   enterStudy();
@@ -240,7 +273,7 @@ function startLesson() {
 
 function startTest() {
   state.mode = "test";
-  state.queue = shuffled(fingerspelling.map((_, i) => i)); // ランダム
+  state.queue = shuffled(signs.map((_, i) => i));
   state.pos = 0;
   state.score = 0;
   enterStudy();
@@ -254,12 +287,13 @@ function enterStudy() {
 
 function exitStudy() {
   stopCamera();
+  setSample(currentItem(), false); // 動画停止
   refreshHome();
   showScreen("home");
 }
 
 function currentItem() {
-  return fingerspelling[state.queue[state.pos]];
+  return signs[state.queue[state.pos]];
 }
 
 function renderStudy() {
@@ -269,27 +303,30 @@ function renderStudy() {
   els.modeChip.textContent = isTest ? "テスト" : "レッスン";
   els.modeChip.classList.toggle("test", isTest);
   els.progressText.textContent = `${state.pos + 1} / ${state.queue.length}`;
-  els.studyBar.style.width =
-    Math.round((state.pos / state.queue.length) * 100) + "%";
+  els.studyBar.style.width = Math.round((state.pos / state.queue.length) * 100) + "%";
 
   els.scoreChip.hidden = !isTest;
   els.scoreChip.textContent = `⭐ ${state.score}`;
 
-  els.glyph.textContent = item.char;
+  els.catChip.textContent = item.category;
+  els.word.textContent = item.word;
   els.reading.textContent = item.reading;
+  els.stepsText.textContent = item.steps;
 
   state.revealed = false;
 
   if (isTest) {
-    // テスト：最初はヒントを隠す
-    els.promptLead.textContent = "この文字を 手で つくってみよう";
-    els.hint.hidden = true;
-    els.hintText.textContent = item.desc;
+    // テスト：お手本とヒントは「答えを見る」まで隠す
+    els.promptLead.textContent = "この手話を やってみよう";
+    els.sample.hidden = true;
+    els.steps.hidden = true;
+    setSample(item, false);
   } else {
-    // レッスン：ヒントを見ながら練習
-    els.promptLead.textContent = "この形を まねしてみよう";
-    els.hint.hidden = false;
-    els.hintText.textContent = item.desc;
+    // レッスン：お手本を見ながら練習
+    els.promptLead.textContent = "お手本を見て まねしてみよう";
+    els.sample.hidden = false;
+    els.steps.hidden = false;
+    setSample(item, true);
   }
 
   renderControls();
@@ -301,24 +338,21 @@ function renderControls() {
 
   if (state.mode === "lesson") {
     const back = button("← もどる", "ghost", prevItem);
-    back.disabled = state.pos === 0;
-    if (back.disabled) back.style.opacity = "0.4";
-    const next = button(
-      state.pos === state.queue.length - 1 ? "できた！ かんりょう 🎉" : "できた！ つぎへ →",
-      "go",
-      () => {
-        learned.add(currentItem().char);
-        saveLearned(learned);
-        advance();
-      }
-    );
+    if (state.pos === 0) {
+      back.disabled = true;
+      back.style.opacity = "0.4";
+    }
+    const last = state.pos === state.queue.length - 1;
+    const next = button(last ? "できた！ かんりょう 🎉" : "できた！ つぎへ →", "go", () => {
+      learned.add(currentItem().word);
+      saveLearned(learned);
+      advance();
+    });
     c.append(back, next);
   } else {
     if (!state.revealed) {
-      // 答え合わせ前
-      c.append(button("答えを見る 👀", "reveal", revealAnswer));
+      c.append(button("お手本を見る 👀", "reveal", revealAnswer));
     } else {
-      // 自己採点
       c.append(
         button("まだ かな △", "maybe", () => grade(false)),
         button("できた！ ◯", "go", () => grade(true))
@@ -337,17 +371,20 @@ function button(label, cls, onClick) {
 
 function revealAnswer() {
   state.revealed = true;
-  els.hint.hidden = false;
-  els.promptLead.textContent = "答え合わせ：合っていたかな？";
+  els.promptLead.textContent = "答え合わせ：お手本と くらべよう";
+  els.sample.hidden = false;
+  els.steps.hidden = false;
+  setSample(currentItem(), true);
   renderControls();
 }
 
 function grade(correct) {
   if (correct) {
     state.score++;
-    learned.add(currentItem().char);
+    learned.add(currentItem().word);
     saveLearned(learned);
   }
+  setSample(currentItem(), false); // 動画停止
   advance();
 }
 
@@ -369,12 +406,13 @@ function advance() {
 
 function finishStudy() {
   stopCamera();
+  setSample(currentItem(), false);
   refreshHome();
 
   if (state.mode === "lesson") {
     els.resultEmoji.textContent = "🎉";
-    els.resultTitle.textContent = "ぜんぶ おぼえた！";
-    els.resultScore.innerHTML = `${state.queue.length}この ゆびもじを れんしゅうしたよ。<br>つぎは テストに ちょうせん！`;
+    els.resultTitle.textContent = "ぜんぶ 見たよ！";
+    els.resultScore.innerHTML = `${state.queue.length}この手話を れんしゅうしたよ。<br>つぎは テストで力だめし！`;
   } else {
     const n = state.queue.length;
     const s = state.score;
@@ -400,9 +438,5 @@ els.resultHomeBtn.addEventListener("click", () => {
 els.resultRetryBtn.addEventListener("click", () => {
   state.mode === "test" ? startTest() : startLesson();
 });
-
-if (!navigator.mediaDevices?.getUserMedia) {
-  els.startLessonBtn.disabled = false; // カメラなしでも練習はできる
-}
 
 refreshHome();
