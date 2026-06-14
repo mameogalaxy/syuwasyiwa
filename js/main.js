@@ -161,6 +161,10 @@ function render() {
     faceSeen = false;
     setStatus('顔を画面に合わせてください');
   }
+
+  // hide the disengage button once the suit is fully released
+  if (!armor.active && !resetBtn.hidden) resetBtn.hidden = true;
+  henshinBtn.disabled = armor.isReleasing;
 }
 
 // ---- UI -------------------------------------------------------------------
@@ -174,7 +178,6 @@ henshinBtn.addEventListener('click', () => {
 });
 
 resetBtn.addEventListener('click', () => {
+  // play the cinematic disengage; the button hides itself once released
   armor.disengage();
-  resetBtn.hidden = true;
-  setStatus(landmarks ? 'READY — 変身ボタンを押せ' : '顔を画面に合わせてください');
 });
