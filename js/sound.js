@@ -158,6 +158,119 @@ export function chord() {
   sh.start(t); sh.stop(t + 1.25);
 }
 
+// A short, sharp "カチッ" lock click.
+export function clickLock() {
+  const c = ac(); if (!c) return;
+  const t = c.currentTime;
+  const src = c.createBufferSource();
+  src.buffer = noiseBuffer(c, 0.06);
+  const bp = c.createBiquadFilter();
+  bp.type = 'highpass'; bp.frequency.value = 3500;
+  const g = c.createGain();
+  g.gain.setValueAtTime(0.45, t);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + 0.06);
+  src.connect(bp).connect(g).connect(c.destination);
+  src.start(t); src.stop(t + 0.07);
+
+  const o = c.createOscillator();
+  o.type = 'square';
+  o.frequency.setValueAtTime(1400, t);
+  o.frequency.exponentialRampToValueAtTime(700, t + 0.04);
+  const og = c.createGain();
+  og.gain.setValueAtTime(0.18, t);
+  og.gain.exponentialRampToValueAtTime(0.0001, t + 0.05);
+  o.connect(og).connect(c.destination);
+  o.start(t); o.stop(t + 0.06);
+}
+
+// A heavy "ガシャン" lock — big metallic impact with a low body.
+export function heavyLock() {
+  const c = ac(); if (!c) return;
+  const t = c.currentTime;
+  const src = c.createBufferSource();
+  src.buffer = noiseBuffer(c, 0.35);
+  const bp = c.createBiquadFilter();
+  bp.type = 'bandpass';
+  bp.frequency.setValueAtTime(1800, t);
+  bp.frequency.exponentialRampToValueAtTime(600, t + 0.25);
+  bp.Q.value = 6;
+  const g = c.createGain();
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(0.6, t + 0.004);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + 0.3);
+  src.connect(bp).connect(g).connect(c.destination);
+  src.start(t); src.stop(t + 0.36);
+
+  const thud = c.createOscillator();
+  thud.type = 'sine';
+  thud.frequency.setValueAtTime(180, t);
+  thud.frequency.exponentialRampToValueAtTime(48, t + 0.2);
+  const tg = c.createGain();
+  tg.gain.setValueAtTime(0.6, t);
+  tg.gain.exponentialRampToValueAtTime(0.0001, t + 0.28);
+  thud.connect(tg).connect(c.destination);
+  thud.start(t); thud.stop(t + 0.3);
+}
+
+// Airy "whoosh" as a part flies toward the face.
+export function whoosh(duration = 0.4) {
+  const c = ac(); if (!c) return;
+  const t = c.currentTime;
+  const src = c.createBufferSource();
+  src.buffer = noiseBuffer(c, duration + 0.05);
+  const bp = c.createBiquadFilter();
+  bp.type = 'bandpass';
+  bp.frequency.setValueAtTime(400, t);
+  bp.frequency.exponentialRampToValueAtTime(2600, t + duration);
+  bp.Q.value = 1.2;
+  const g = c.createGain();
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(0.18, t + duration * 0.6);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + duration);
+  src.connect(bp).connect(g).connect(c.destination);
+  src.start(t); src.stop(t + duration + 0.05);
+}
+
+// Targeting scan sweep for the eye-scan stage.
+export function scanSweep(duration = 0.6) {
+  const c = ac(); if (!c) return;
+  const t = c.currentTime;
+  const o = c.createOscillator();
+  o.type = 'sine';
+  o.frequency.setValueAtTime(700, t);
+  o.frequency.exponentialRampToValueAtTime(1600, t + duration);
+  const lfo = c.createOscillator();
+  lfo.type = 'square'; lfo.frequency.value = 28;
+  const lg = c.createGain(); lg.gain.value = 0.12;
+  const g = c.createGain();
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(0.12, t + 0.05);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + duration);
+  lfo.connect(lg).connect(g.gain);
+  o.connect(g).connect(c.destination);
+  o.start(t); lfo.start(t);
+  o.stop(t + duration + 0.02); lfo.stop(t + duration + 0.02);
+}
+
+// HUD boot — a quick run of confirmation beeps.
+export function hudBoot() {
+  const c = ac(); if (!c) return;
+  const t0 = c.currentTime;
+  const notes = [880, 1175, 1568, 2093];
+  notes.forEach((f, i) => {
+    const t = t0 + i * 0.07;
+    const o = c.createOscillator();
+    o.type = 'square';
+    o.frequency.value = f;
+    const g = c.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.12, t + 0.005);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.06);
+    o.connect(g).connect(c.destination);
+    o.start(t); o.stop(t + 0.07);
+  });
+}
+
 // Soft reset / disengage sound.
 export function powerDown(duration = 0.5) {
   const c = ac(); if (!c) return;

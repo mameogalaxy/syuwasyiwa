@@ -1,6 +1,7 @@
 import { FilesetResolver, FaceLandmarker }
   from 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/vision_bundle.mjs';
-import { buildFrame, Armor } from './armor.js';
+import { extractPoints, buildFrame, Armor } from './armor.js';
+import { Effects } from './effects.js';
 import * as sfx from './sound.js';
 
 const VISION_WASM = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm';
@@ -17,7 +18,8 @@ const henshinBtn = document.getElementById('henshinBtn');
 const resetBtn = document.getElementById('resetBtn');
 const statusEl = document.getElementById('status');
 
-const armor = new Armor();
+const fx = new Effects();
+const armor = new Armor(fx);
 let faceLandmarker = null;
 let lastVideoTime = -1;
 let landmarks = null;
@@ -25,13 +27,12 @@ let dpr = Math.min(window.devicePixelRatio || 1, 2);
 let lastFrame = performance.now();
 let faceSeen = false;
 
-armor.onStage = (name) => {
-  if (name) setStatus(name);
-};
+// EMA-smoothed key points (screen px) to kill detector jitter
+let sm = null;
+const SMOOTH = 0.5;
 
-function setStatus(text) {
-  statusEl.textContent = text;
-}
+armor.onStage = (name) => { if (name) setStatus(name); };
+const setStatus = (text) => { statusEl.textContent = text; };
 
 function resize() {
   dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -44,7 +45,6 @@ window.addEventListener('resize', resize);
 resize();
 
 // ---- boot -----------------------------------------------------------------
-
 async function boot() {
   startBtn.disabled = true;
   gateMsg.classList.remove('error');
@@ -87,12 +87,10 @@ function describeError(err) {
 }
 
 // ---- render loop ----------------------------------------------------------
-
 function loop(now) {
   const dt = Math.min(0.05, (now - lastFrame) / 1000);
   lastFrame = now;
 
-  // Detect on fresh video frames only.
   if (faceLandmarker && video.readyState >= 2 && video.currentTime !== lastVideoTime) {
     lastVideoTime = video.currentTime;
     const res = faceLandmarker.detectForVideo(video, now);
@@ -100,6 +98,7 @@ function loop(now) {
   }
 
   armor.update(dt);
+  fx.update(dt, armor.power);
   render();
   requestAnimationFrame(loop);
 }
@@ -110,15 +109,35 @@ function coverParams() {
   const vw = video.videoWidth || 1280, vh = video.videoHeight || 720;
   const scale = Math.max(cw / vw, ch / vh);
   const dw = vw * scale, dh = vh * scale;
-  const dx = (cw - dw) / 2, dy = (ch - dh) / 2;
-  return { cw, ch, dw, dh, dx, dy };
+  return { cw, ch, dw, dh, dx: (cw - dw) / 2, dy: (ch - dh) / 2 };
 }
 
 function render() {
   const { cw, ch, dw, dh, dx, dy } = coverParams();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.clearRect(0, 0, cw, ch);
 
-  // draw the camera image mirrored (selfie view)
+  // build a smoothed face frame
+  let F = null;
+  if (landmarks) {
+    const map = (i) => {
+      const p = landmarks[i];
+      return { x: cw - (dx + p.x * dw), y: dy + p.y * dh };
+    };
+    const raw = extractPoints(map);
+    if (!sm) sm = raw;
+    const lp = (a, b) => ({ x: a.x + (b.x - a.x) * SMOOTH, y: a.y + (b.y - a.y) * SMOOTH });
+    sm = { le: lp(sm.le, raw.le), re: lp(sm.re, raw.re), chin: lp(sm.chin, raw.chin) };
+    F = buildFrame(sm.le, sm.re, sm.chin);
+  } else {
+    sm = null;
+  }
+
+  // camera shake offset applied to the camera + armour layer
+  const sh = fx.shakeOffset();
+  ctx.save();
+  ctx.translate(sh.x, sh.y);
+
   if (video.readyState >= 2) {
     ctx.save();
     ctx.translate(cw, 0);
@@ -127,15 +146,17 @@ function render() {
     ctx.restore();
   }
 
+  if (F) armor.draw(ctx, F);
+  fx.drawParticles(ctx);
+  ctx.restore(); // end shake
+
+  // full-screen flash, then HUD (stable, not shaken)
+  fx.drawFlash(ctx, cw, ch);
+  if (F) fx.drawHud(ctx, F, armor.power, cw, ch);
+
+  // status hints
   if (landmarks) {
     if (!faceSeen) { faceSeen = true; if (!armor.active) setStatus('READY — 変身ボタンを押せ'); }
-    // landmark -> mirrored canvas px
-    const map = (i) => {
-      const p = landmarks[i];
-      return { x: cw - (dx + p.x * dw), y: dy + p.y * dh };
-    };
-    const F = buildFrame(map);
-    armor.draw(ctx, F);
   } else if (!armor.active) {
     faceSeen = false;
     setStatus('顔を画面に合わせてください');
@@ -143,7 +164,6 @@ function render() {
 }
 
 // ---- UI -------------------------------------------------------------------
-
 startBtn.addEventListener('click', () => { sfx.unlock(); boot(); });
 
 henshinBtn.addEventListener('click', () => {
@@ -154,7 +174,7 @@ henshinBtn.addEventListener('click', () => {
 });
 
 resetBtn.addEventListener('click', () => {
-  armor.reset();
+  armor.disengage();
   resetBtn.hidden = true;
   setStatus(landmarks ? 'READY — 変身ボタンを押せ' : '顔を画面に合わせてください');
 });
