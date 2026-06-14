@@ -11,7 +11,7 @@
 import {
   fly, shape, metal, strokePts, discU, sphere, ember, mirror, clamp01, trace,
   easeOutBack, easeOutExpo, FACE_OVAL,
-} from './gfx.js?v=8';
+} from './gfx.js?v=9';
 
 const L = strokePts;
 const both = (fn) => (ctx, F, p, env) => { fn(ctx, F, p, env, 1); fn(ctx, F, p, env, -1); };
@@ -226,36 +226,100 @@ const TENGU = {
 };
 
 // ============================================================ OKAME =========
-function okameFace(ctx, F, p, env) { skin(ctx, F, p, env, ['#e7c9a8', '#f6e2cc', '#fff6ec']); }
-function okameHair(ctx, F, p, env) {
-  const xf = fly(F, p, { fromV: -1.8, fromScale: 0.7, pivot: [0, -0.8] });
-  shape(ctx, F, xf, [[-1.25, 0.3], [-1.2, -0.6], [-0.6, -1.25], [0, -1.4], [0.6, -1.25], [1.2, -0.6], [1.25, 0.3],
-    [0.9, -0.1], [0.5, -0.45], [0, -0.55], [-0.5, -0.45], [-0.9, -0.1]],
-    { c0: '#000', c1: '#1c1c22', c2: '#3a3a44', outline: null });
-  // hair side buns
-  for (const s of [1, -1]) discU(ctx, F, xf, 1.15 * s, 0.5, 0.32, [[0, '#3a3a44'], [0.6, '#16161c'], [1, '#000']]);
+// Traditional Otafuku / Okame: a plump, pale, beaming face with glossy
+// lacquered black hair, big rosy cheeks, gentle half-moon eyes, high painted
+// brows, a soft little nose and small glossy red lips. Parts draw back-to-front.
+
+// soft warm cream face with a forehead specular and a rosy drift toward cheeks
+function okameFace(ctx, F, p, env) {
+  const xf = skin(ctx, F, p, env, ['#e8c6a4', '#f8e6d2', '#fff8f0'], {
+    spec: [-0.32, -0.5], specR: 0.78, hi: 0.34, top: -1.25, bot: 2.0,
+  });
+  ctx.save();
+  trace(ctx, xf, FACE_OVAL); ctx.clip();
+  for (const s of [1, -1]) {
+    const c = xf(0.62 * s, 0.95), r = F.s * 1.05;
+    const g = ctx.createRadialGradient(c.x, c.y, r * 0.1, c.x, c.y, r);
+    g.addColorStop(0, 'rgba(255,176,176,0.30)');
+    g.addColorStop(0.6, 'rgba(255,176,176,0.08)');
+    g.addColorStop(1, 'rgba(255,176,176,0)');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+  }
+  const cb = xf(0, 1.95), rb = F.s * 1.1;
+  const gb = ctx.createRadialGradient(cb.x, cb.y, rb * 0.1, cb.x, cb.y, rb);
+  gb.addColorStop(0, 'rgba(190,120,95,0.18)');
+  gb.addColorStop(1, 'rgba(190,120,95,0)');
+  ctx.fillStyle = gb; ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+  ctx.restore();
 }
+
+const OKAME_CROWN = [
+  [-1.28, 0.42], [-1.3, -0.42], [-0.86, -1.12], [-0.34, -1.46], [0, -1.52],
+  [0.34, -1.46], [0.86, -1.12], [1.3, -0.42], [1.28, 0.42],
+  [0.98, 0.02], [0.66, -0.34], [0.3, -0.52], [0.07, -0.34], [0, -0.18],
+  [-0.07, -0.34], [-0.3, -0.52], [-0.66, -0.34], [-0.98, 0.02],
+];
+function okameHair(ctx, F, p, env) {
+  const xf = fly(F, p, { fromV: -2.0, fromScale: 0.78, pivot: [0, -0.9] });
+  for (const s of [1, -1]) {
+    sphere(ctx, F, xf, 1.16 * s, 0.46, 0.34, '#101016', '#45454f', null);
+    sphere(ctx, F, xf, 1.0 * s, -0.18, 0.2, '#0d0d12', '#3a3a44', null);
+  }
+  shape(ctx, F, xf, OKAME_CROWN, {
+    c0: '#050507', c1: '#1a1a22', c2: '#46464f', outline: null,
+    top: -1.45, bot: 0.6, hi: 0.36, spec: [-0.5, -1.0], specR: 0.5,
+  });
+  for (const s of [1, -1])
+    L(ctx, F, xf, [[0.18 * s, -0.28], [0.6 * s, -0.62], [1.02 * s, -0.5], [1.18 * s, -0.05]],
+      'rgba(190,200,225,0.4)', 0.03, 0);
+  for (const s of [1, -1])
+    L(ctx, F, xf, [[1.02 * s, 0.3], [1.18 * s, 0.5]], 'rgba(220,228,245,0.55)', 0.04, 0);
+}
+
 function okameCheeks(ctx, F, p, env) {
   const xf = fly(F, p, { fromScale: 0.1, pivot: [0, 0.7] });
-  const a = 0.5 + 0.5 * easeOutBack(clamp01(p));
-  for (const s of [1, -1]) { ctx.save(); ctx.globalAlpha = a; discU(ctx, F, xf, 0.78 * s, 0.85, 0.3, [[0, 'rgba(255,150,150,0.9)'], [1, 'rgba(240,90,110,0)']]); ctx.restore(); }
+  const a = 0.55 + 0.45 * easeOutBack(clamp01(p));
+  for (const s of [1, -1]) {
+    ctx.save(); ctx.globalAlpha = a;
+    discU(ctx, F, xf, 0.74 * s, 0.92, 0.34,
+      [[0, 'rgba(255,150,158,0.92)'], [0.55, 'rgba(248,108,128,0.5)'], [1, 'rgba(240,90,110,0)']]);
+    discU(ctx, F, xf, (0.74 - 0.1) * s, 0.82, 0.1,
+      [[0, 'rgba(255,255,255,0.7)'], [1, 'rgba(255,255,255,0)']]);
+    ctx.restore();
+  }
 }
+
 function okameEyes(ctx, F, p, env) {
   const xf = fly(F, p, { fromScale: 0.2, pivot: [0, 0] });
-  for (const s of [1, -1]) L(ctx, F, xf, [[0.28 * s, 0.05], [0.5 * s, 0.0], [0.66 * s, 0.06]], '#1a1a1a', 0.03, 0);
-  // tiny brows (high dots)
-  for (const s of [1, -1]) discU(ctx, F, xf, 0.45 * s, -0.5, 0.07, [[0, '#2a2a2a'], [1, '#000']]);
+  for (const s of [1, -1]) {
+    const eye = [[0.26 * s, 0.0], [0.4 * s, 0.1], [0.5 * s, 0.13], [0.6 * s, 0.1], [0.7 * s, 0.0]];
+    L(ctx, F, xf, eye, '#16161a', 0.034, 0);
+    L(ctx, F, xf, [[0.3 * s, -0.05], [0.5 * s, 0.02], [0.66 * s, -0.05]], 'rgba(60,40,40,0.35)', 0.016, 0);
+    L(ctx, F, xf, [[0.34 * s, -0.6], [0.48 * s, -0.66], [0.62 * s, -0.6]], '#1c1c20', 0.045, 0);
+  }
 }
+
+function okameNose(ctx, F, p, env) {
+  const xf = fly(F, p, { fromV: -0.4, fromScale: 0.3, pivot: [0, 0.75] });
+  sphere(ctx, F, xf, 0, 0.78, 0.12, '#e6b89a', '#fdeada', null);
+  for (const s of [1, -1])
+    discU(ctx, F, xf, 0.07 * s, 0.86, 0.04, [[0, 'rgba(150,90,70,0.5)'], [1, 'rgba(150,90,70,0)']]);
+}
+
 function okameMouth(ctx, F, p, env) {
   const xf = fly(F, p, { fromScale: 0.2, pivot: [0, 1.1] });
-  discU(ctx, F, xf, 0, 1.15, 0.12, [[0, '#ff7a86'], [0.7, '#e23b56'], [1, '#a3132e']], 'rgba(120,10,30,0.6)');
+  sphere(ctx, F, xf, 0, 1.16, 0.13, '#c01430', '#ff6f80', 'rgba(120,10,30,0.55)');
+  discU(ctx, F, xf, 0, 1.18, 0.07, [[0, 'rgba(160,20,40,0.55)'], [1, 'rgba(160,20,40,0)']]);
+  L(ctx, F, xf, [[-0.06, 1.1], [0, 1.085], [0.06, 1.1]], 'rgba(255,235,235,0.8)', 0.02, 0);
 }
+
 const OKAME = {
   id: 'okame', name: 'おかめ', emoji: '😊', finale: 'puff',
   parts: [
     { dur: 0.5, anchor: [0, 0.5], lock: { sound: 'click', shake: 5, burst: 10 }, draw: okameFace },
-    { dur: 0.5, anchor: [0, -0.8], lock: { sound: 'heavy', shake: 6, burst: 12 }, draw: okameHair },
-    { dur: 0.35, anchor: [0, 0.85], lock: { sound: 'click', shake: 3 }, draw: okameCheeks },
+    { dur: 0.5, anchor: [0, -0.85], lock: { sound: 'heavy', shake: 6, burst: 12 }, draw: okameHair },
+    { dur: 0.35, anchor: [0, 0.9], lock: { sound: 'click', shake: 3 }, draw: okameCheeks },
+    { dur: 0.3, anchor: [0, 0.78], lock: { sound: 'click', shake: 2 }, draw: okameNose },
     { dur: 0.35, anchor: [0, 0], lock: { sound: 'click', shake: 3 }, draw: okameEyes },
     { dur: 0.35, anchor: [0, 1.15], lock: { sound: 'click', shake: 3 }, draw: okameMouth },
   ],
@@ -458,50 +522,128 @@ const ZOMBIE = {
 };
 
 // ============================================================ POOP ==========
-function poopTier(ctx, F, cx, cy, rx, ry, p, fromV) {
-  const xf = fly(F, p, { fromV, fromScale: 0.4, pivot: [cx, cy] });
+// Hyper-quality glossy soft-serve poop. Warm chocolate palette:
+//   #3a2410 deep shadow · #7a4a22 mid · #c98a4a light · #e8b878 sheen.
+const POOP_C = { d: '#3a2410', m: '#7a4a22', l: '#c98a4a', hi: '#e8b878' };
+
+// One rounded, glossy tier. `lean` curls the swirl sideways.
+function poopTier(ctx, F, cx, cy, rx, ry, p, fromV, lean = 0) {
+  const xf = fly(F, p, { fromV, fromScale: 0.42, fromRot: lean * 0.5, pivot: [cx, cy] });
   const pts = [];
-  const n = 18;
+  const n = 40;
   for (let i = 0; i < n; i++) {
     const a = (i / n) * Math.PI * 2;
-    pts.push([cx + Math.cos(a) * rx, cy + Math.sin(a) * ry]);
+    const ry2 = a > Math.PI ? ry * 1.04 : ry * 0.9;
+    const lobe = 1 + 0.05 * Math.sin(a * 3);
+    const lx = lean * 0.18 * Math.cos(a) * Math.sin(a);
+    pts.push([cx + Math.cos(a) * rx * lobe + lx, cy + Math.sin(a) * ry2 * lobe]);
   }
   shape(ctx, F, xf, pts, {
-    c0: '#4a2911', c1: '#8a5424', c2: '#cf924f', outline: 'rgba(50,28,10,0.6)',
-    top: cy - ry, bot: cy + ry, spec: [cx - rx * 0.32, cy - ry * 0.42], specR: rx * 0.5, hi: 0.32,
+    c0: POOP_C.d, c1: POOP_C.m, c2: POOP_C.l,
+    outline: 'rgba(40,22,10,0.55)', ow: 0.02,
+    top: cy - ry, bot: cy + ry,
+    lightV: 0.22, hi: 0.36,
+    spec: [cx - rx * 0.28, cy - ry * 0.5], specR: rx * 0.6,
   });
+  L(ctx, F, xf, [
+    [cx - rx * 0.62, cy - ry * 0.42], [cx - rx * 0.2, cy - ry * 0.66],
+    [cx + rx * 0.34, cy - ry * 0.6], [cx + rx * 0.66, cy - ry * 0.34],
+  ], 'rgba(232,184,120,0.5)', 0.04, 0);
+  L(ctx, F, xf, [
+    [cx - rx * 0.7, cy + ry * 0.5], [cx, cy + ry * 0.78], [cx + rx * 0.7, cy + ry * 0.5],
+  ], 'rgba(30,16,6,0.45)', 0.05, 0);
 }
+
+function poopSeam(ctx, F, xf, cx, cy, w) {
+  const pts = [];
+  for (let i = 0; i <= 14; i++) {
+    const t = i / 14;
+    pts.push([cx - w + t * 2 * w, cy + Math.sin(t * Math.PI) * w * 0.34 - 0.02]);
+  }
+  L(ctx, F, xf, pts, 'rgba(40,22,10,0.4)', 0.022, 0);
+  L(ctx, F, xf, pts.map(([u, v]) => [u, v - 0.045]), 'rgba(232,184,120,0.4)', 0.016, 0);
+}
+
 const POOP = {
   id: 'poop', name: 'うんこ', emoji: '💩', finale: 'puff',
   parts: [
-    { dur: 0.45, anchor: [0, 1.6], lock: { sound: 'heavy', shake: 7, burst: 12 }, draw: (c, F, p) => poopTier(c, F, 0, 1.55, 1.25, 0.7, p, 1.6) },
-    { dur: 0.45, anchor: [0, 0.7], lock: { sound: 'heavy', shake: 6, burst: 10 }, draw: (c, F, p) => poopTier(c, F, 0, 0.7, 1.0, 0.62, p, 1.0) },
-    { dur: 0.45, anchor: [0, -0.2], lock: { sound: 'heavy', shake: 6, burst: 10 }, draw: (c, F, p) => poopTier(c, F, 0, -0.15, 0.72, 0.52, p, 0.8) },
     {
-      dur: 0.4, anchor: [0, -1.0], lock: { sound: 'click', shake: 5 }, draw: (ctx, F, p) => {
-        const xf = fly(F, p, { fromV: -1.5, fromScale: 0.3, pivot: [0, -0.7] });
-        shape(ctx, F, xf, [[-0.4, -0.5], [0.4, -0.5], [0.22, -1.0], [0, -1.5], [-0.22, -1.0]],
-          { c0: '#4a2911', c1: '#8a5424', c2: '#cf924f', outline: 'rgba(50,28,10,0.6)', top: -1.5, bot: -0.5, spec: [-0.12, -0.9], specR: 0.3, hi: 0.34 });
+      dur: 0.45, anchor: [0, 1.55], lock: { sound: 'heavy', shake: 8, burst: 14 },
+      draw: (c, F, p) => {
+        poopTier(c, F, 0, 1.5, 1.28, 0.74, p, 1.7, 0);
+        const xf = fly(F, p, { fromV: 1.7, fromScale: 0.42, pivot: [0, 1.5] });
+        poopSeam(c, F, xf, 0, 0.86, 1.05);
       },
     },
     {
-      dur: 0.35, anchor: [0, 0.1], lock: { sound: 'click', shake: 3 }, draw: (ctx, F, p) => {
-        const xf = fly(F, p, { fromScale: 0.2 });
+      dur: 0.45, anchor: [0, 0.7], lock: { sound: 'heavy', shake: 7, burst: 12 },
+      draw: (c, F, p) => {
+        poopTier(c, F, 0, 0.7, 1.02, 0.64, p, 1.0, -0.35);
+        const xf = fly(F, p, { fromV: 1.0, fromScale: 0.42, fromRot: -0.175, pivot: [0, 0.7] });
+        poopSeam(c, F, xf, 0.04, 0.12, 0.82);
+      },
+    },
+    {
+      dur: 0.42, anchor: [0, -0.15], lock: { sound: 'heavy', shake: 6, burst: 10 },
+      draw: (c, F, p) => {
+        poopTier(c, F, 0, -0.15, 0.74, 0.54, p, 0.85, 0.4);
+        const xf = fly(F, p, { fromV: 0.85, fromScale: 0.42, fromRot: 0.2, pivot: [0, -0.15] });
+        poopSeam(c, F, xf, -0.02, -0.62, 0.6);
+      },
+    },
+    {
+      dur: 0.4, anchor: [0, -1.0], lock: { sound: 'click', shake: 5, burst: 8 },
+      draw: (ctx, F, p) => {
+        const xf = fly(F, p, { fromV: -1.6, fromScale: 0.25, fromRot: 0.6, pivot: [0, -0.55] });
+        shape(ctx, F, xf, [
+          [-0.42, -0.5], [-0.34, -0.86], [-0.16, -1.18], [0.04, -1.42],
+          [0.22, -1.58], [0.3, -1.5], [0.16, -1.28], [0.06, -1.02],
+          [0.16, -0.78], [0.4, -0.56], [0.18, -0.46],
+        ], {
+          c0: POOP_C.d, c1: POOP_C.m, c2: POOP_C.l,
+          outline: 'rgba(40,22,10,0.55)', ow: 0.02,
+          top: -1.6, bot: -0.5, lightV: 0.2, hi: 0.38,
+          spec: [-0.06, -1.2], specR: 0.26,
+        });
+        L(ctx, F, xf, [[-0.18, -0.66], [-0.04, -1.0], [0.08, -1.32], [0.18, -1.5]],
+          'rgba(232,184,120,0.55)', 0.028, 0);
+      },
+    },
+    {
+      dur: 0.35, anchor: [0, 0.05], lock: { sound: 'click', shake: 3 },
+      draw: (ctx, F, p) => {
+        const xf = fly(F, p, { fromScale: 0.15, pivot: [0, 0.05] });
         for (const s of [1, -1]) {
-          discU(ctx, F, xf, 0.42 * s, 0.05, 0.26, [[0, '#fff'], [0.8, '#fff'], [1, '#e0e0e0']], 'rgba(0,0,0,0.5)');
-          discU(ctx, F, xf, 0.42 * s, 0.1, 0.12, [[0, '#333'], [1, '#000']]);
+          sphere(ctx, F, xf, 0.46 * s, 0.02, 0.3, '#dfe3ea', '#ffffff', 'rgba(30,18,8,0.55)');
+          discU(ctx, F, xf, 0.4 * s, 0.08, 0.15,
+            [[0, '#3a2a22'], [0.5, '#150d08'], [1, '#000']], 'rgba(0,0,0,0.5)');
+          discU(ctx, F, xf, 0.35 * s, 0.0, 0.05, [[0, '#fff'], [1, 'rgba(255,255,255,0)']]);
+          discU(ctx, F, xf, 0.44 * s, 0.13, 0.025, [[0, 'rgba(255,255,255,0.9)'], [1, 'rgba(255,255,255,0)']]);
         }
       },
     },
     {
-      dur: 0.35, anchor: [0, 0.8], lock: { sound: 'click', shake: 3 }, draw: (ctx, F, p) => {
-        const xf = fly(F, p, { fromScale: 0.2, pivot: [0, 0.8] });
-        const a = clamp01(p);
-        ctx.save(); ctx.globalAlpha = a;
-        ctx.strokeStyle = '#2a1606'; ctx.lineWidth = Math.max(2, F.s * 0.06); ctx.lineCap = 'round';
-        ctx.beginPath();
-        for (let i = 0; i <= 16; i++) { const t = i / 16, u = -0.45 + t * 0.9, v = 0.7 + Math.sin(t * Math.PI) * 0.45; const q = xf(u, v); i ? ctx.lineTo(q.x, q.y) : ctx.moveTo(q.x, q.y); }
-        ctx.stroke(); ctx.restore();
+      dur: 0.35, anchor: [0, 0.78], lock: { sound: 'click', shake: 3 },
+      draw: (ctx, F, p) => {
+        const xf = fly(F, p, { fromScale: 0.2, pivot: [0, 0.78] });
+        const mouth = [
+          [-0.5, 0.66], [-0.3, 0.6], [0, 0.58], [0.3, 0.6], [0.5, 0.66],
+          [0.34, 0.96], [0, 1.08], [-0.34, 0.96],
+        ];
+        shape(ctx, F, xf, mouth, {
+          c0: '#1a0c04', c1: '#3a160c', c2: '#5a200f',
+          outline: 'rgba(20,10,4,0.7)', ow: 0.022,
+          top: 0.58, bot: 1.08, hi: 0.18, spec: [-0.1, 0.7], specR: 0.16,
+        });
+        shape(ctx, F, xf, [
+          [-0.26, 0.92], [0, 0.86], [0.26, 0.92], [0.2, 1.06], [0, 1.1], [-0.2, 1.06],
+        ], {
+          c0: '#8a2030', c1: '#c83a4e', c2: '#ee6a7c',
+          outline: 'rgba(70,12,20,0.6)', ow: 0.018, shadow: false,
+          top: 0.86, bot: 1.1, hi: 0.3, spec: [-0.06, 0.94], specR: 0.12,
+        });
+        L(ctx, F, xf, [[-0.4, 0.66], [0, 0.6], [0.4, 0.66]],
+          'rgba(232,184,120,0.45)', 0.02, 0);
       },
     },
   ],
@@ -576,40 +718,98 @@ const TREE = {
 };
 
 // ============================================================ ANT ===========
+const ANT_GROOVES = [
+  [[-0.74, -0.42], [0, -0.56], [0.74, -0.42]],
+  [[-0.92, 0.12], [0, 0.02], [0.92, 0.12]],
+  [[-0.66, 0.62], [0, 0.74], [0.66, 0.62]],
+];
 function antHead(ctx, F, p, env) {
-  const xf = skin(ctx, F, p, env, ['#0c0c10', '#2a1a14', '#5a2a1e']);
-  // glossy highlight band
-  ctx.save(); ctx.globalAlpha = 0.5;
-  L(ctx, F, xf, [[-0.7, -0.5], [0, -0.7], [0.7, -0.5]], 'rgba(180,140,120,0.5)', 0.05, 0);
+  const xf = skin(ctx, F, p, env, ['#08080c', '#241410', '#5a2a1e'], {
+    spec: [-0.32, -0.5], specR: 0.5, hi: 0.34, top: -1.25, bot: 2.0,
+    grooves: ANT_GROOVES,
+  });
+  ctx.save(); ctx.globalAlpha = 0.6;
+  L(ctx, F, xf, [[-0.78, -0.54], [-0.3, -0.74], [0.3, -0.74], [0.78, -0.54]],
+    'rgba(210,180,170,0.6)', 0.07, 0);
+  ctx.restore();
+  ctx.save(); ctx.globalAlpha = 0.85;
+  L(ctx, F, xf, [[-0.34, -0.66], [0.2, -0.7]], 'rgba(255,244,238,0.9)', 0.02, 0);
+  ctx.restore();
+  ctx.save(); ctx.globalAlpha = 0.4;
+  for (const s of [1, -1])
+    L(ctx, F, xf, [[1.06 * s, -0.1], [1.12 * s, 0.55], [0.96 * s, 1.15]],
+      'rgba(150,70,48,0.8)', 0.03, 0);
   ctx.restore();
 }
-function antAntennae(ctx, F, p, env) {
-  const xf = fly(F, p, { fromV: -1.4, fromScale: 0.5, pivot: [0, -0.8] });
+function antEyes(ctx, F, p, env) {
+  const xf = fly(F, p, { fromV: -0.5, fromScale: 0.3, pivot: [0, 0.1] });
   for (const s of [1, -1]) {
-    ctx.save(); ctx.strokeStyle = '#0a0a0e'; ctx.lineWidth = Math.max(2, F.s * 0.05); ctx.lineCap = 'round';
-    ctx.beginPath();
-    const pts = [[0.15 * s, -0.6], [0.4 * s, -1.1], [0.75 * s, -1.4], [1.0 * s, -1.85]];
-    for (let i = 0; i < pts.length; i++) { const q = xf(pts[i][0], pts[i][1]); i ? ctx.lineTo(q.x, q.y) : ctx.moveTo(q.x, q.y); }
-    ctx.stroke(); ctx.restore();
-    discU(ctx, F, xf, 1.0 * s, -1.85, 0.12, [[0, '#5a2a1e'], [0.6, '#2a1410'], [1, '#000']]);
+    const eu = 0.74 * s, ev = -0.02;
+    discU(ctx, F, xf, eu, ev + 0.04, 0.5,
+      [[0, 'rgba(4,4,8,0.9)'], [0.6, 'rgba(8,6,10,0.55)'], [1, 'rgba(8,6,10,0)']]);
+    sphere(ctx, F, xf, eu, ev, 0.4, '#0c0c14', '#7a7a92', 'rgba(0,0,0,0.7)');
+    ctx.save(); ctx.globalAlpha = 0.16;
+    for (const [du, dv, r] of [[-0.12, -0.08, 0.07], [0.1, -0.02, 0.06],
+      [-0.04, 0.12, 0.06], [0.14, 0.14, 0.05], [-0.16, 0.08, 0.05]])
+      discU(ctx, F, xf, eu + du * s, ev + dv, r,
+        [[0, 'rgba(190,200,220,0.6)'], [1, 'rgba(60,64,80,0)']]);
+    ctx.restore();
+    ctx.save(); ctx.globalAlpha = 0.5;
+    discU(ctx, F, xf, eu + 0.14 * s, ev + 0.16, 0.06,
+      [[0, 'rgba(255,255,255,0.9)'], [1, 'rgba(255,255,255,0)']]);
+    ctx.restore();
   }
 }
-function antEyes(ctx, F, p, env) {
-  const xf = fly(F, p, { fromScale: 0.2 });
-  for (const s of [1, -1]) sphere(ctx, F, xf, 0.6 * s, 0.0, 0.34, '#0e0e16', '#5c5c70', 'rgba(0,0,0,0.6)');
+function antAntenna(ctx, F, p, env, s) {
+  const xf = fly(F, p, { fromV: -1.5, fromRot: -0.5 * s, fromScale: 0.4, pivot: [0.2 * s, -0.6] });
+  const seg = [
+    [0.16 * s, -0.58], [0.34 * s, -0.92], [0.4 * s, -1.18],
+    [0.66 * s, -1.42], [0.98 * s, -1.58], [1.26 * s, -1.82],
+  ];
+  L(ctx, F, xf, seg, '#08080c', 0.05, 0);
+  L(ctx, F, xf, seg.slice(2), '#160c0a', 0.034, 0);
+  ctx.save(); ctx.globalAlpha = 0.45;
+  L(ctx, F, xf, [[0.2 * s, -0.7], [0.42 * s, -1.16], [0.78 * s, -1.46]],
+    'rgba(170,120,100,0.7)', 0.014, 0);
+  ctx.restore();
+  sphere(ctx, F, xf, 1.26 * s, -1.82, 0.15, '#3a1c14', '#8a4632', 'rgba(0,0,0,0.6)');
 }
-function antMandibles(ctx, F, p, env) {
-  const xf = fly(F, p, { fromV: 0.8, fromScale: 0.5, pivot: [0, 1.4] });
-  for (const s of [1, -1]) shape(ctx, F, xf, [[0.1 * s, 1.2], [0.5 * s, 1.35], [0.7 * s, 1.85], [0.45 * s, 1.95], [0.3 * s, 1.55], [0.05 * s, 1.45]],
-    { c0: '#0a0a0e', c1: '#241410', c2: '#5a2a1e', outline: 'rgba(0,0,0,0.6)' });
+function antMandibles(ctx, F, p, env, s) {
+  const xf = fly(F, p, { fromU: 1.2 * s, fromV: 0.7, fromRot: 0.5 * s, fromScale: 0.5, pivot: [0.2 * s, 1.25] });
+  const MAND = [
+    [0.06 * s, 1.12], [0.42 * s, 1.18], [0.78 * s, 1.4],
+    [0.92 * s, 1.78], [0.74 * s, 2.06], [0.5 * s, 2.12],
+    [0.62 * s, 1.86], [0.5 * s, 1.6], [0.22 * s, 1.42],
+    [0.04 * s, 1.3],
+  ];
+  shape(ctx, F, xf, MAND, {
+    c0: '#08080c', c1: '#241410', c2: '#5a2a1e',
+    outline: 'rgba(0,0,0,0.65)', ow: 0.02,
+    top: 1.0, bot: 2.1, spec: [0.6 * s, 1.55], specR: 0.3, hi: 0.3,
+  });
+  ctx.save(); ctx.globalAlpha = 0.6;
+  L(ctx, F, xf, [[0.46 * s, 1.22], [0.82 * s, 1.46], [0.92 * s, 1.78], [0.74 * s, 2.04]],
+    'rgba(200,150,128,0.8)', 0.016, 0);
+  ctx.restore();
+  sphere(ctx, F, xf, 0.52 * s, 2.1, 0.07, '#3a1c14', '#9a5238', 'rgba(0,0,0,0.6)');
+}
+function antPalps(ctx, F, p, env) {
+  const xf = fly(F, p, { fromV: 0.4, fromScale: 0.4, pivot: [0, 1.2] });
+  shape(ctx, F, xf, [[-0.16, 1.06], [0.16, 1.06], [0.1, 1.34], [0, 1.42], [-0.1, 1.34]],
+    { c0: '#08080c', c1: '#1e110c', c2: '#3a1c14', gloss: false, outline: 'rgba(0,0,0,0.6)' });
+  for (const s of [1, -1]) {
+    L(ctx, F, xf, [[0.12 * s, 1.18], [0.26 * s, 1.4], [0.3 * s, 1.62]], '#120a08', 0.02, 0);
+    discU(ctx, F, xf, 0.3 * s, 1.62, 0.05, [[0, '#5a2a1e'], [1, '#0a0608']]);
+  }
 }
 const ANT = {
   id: 'ant', name: 'アリ', emoji: '🐜', finale: 'puff',
   parts: [
-    { dur: 0.5, anchor: [0, 0.4], lock: { sound: 'heavy', shake: 6, burst: 10 }, draw: antHead },
-    { dur: 0.45, anchor: [0, -1.4], lock: { sound: 'click', shake: 5, burst: 12 }, draw: antAntennae },
-    { dur: 0.4, anchor: [0.6, 0], lock: { sound: 'click', shake: 4 }, draw: antEyes },
-    { dur: 0.4, anchor: [0, 1.7], lock: { sound: 'heavy', shake: 7, burst: 14, both: true }, draw: antMandibles },
+    { dur: 0.5, anchor: [0, 0.4], lock: { sound: 'heavy', shake: 7, burst: 12 }, draw: antHead },
+    { dur: 0.4, anchor: [0.74, 0], lock: { sound: 'click', shake: 4, burst: 6, both: true }, draw: antEyes },
+    { dur: 0.45, anchor: [0, -1.4], lock: { sound: 'click', shake: 5, burst: 10, both: true }, draw: both(antAntenna) },
+    { dur: 0.4, anchor: [0, 1.7], lock: { sound: 'heavy', shake: 8, burst: 16, both: true }, draw: both(antMandibles) },
+    { dur: 0.35, anchor: [0, 1.2], lock: { sound: 'click', shake: 3 }, draw: antPalps },
   ],
 };
 
