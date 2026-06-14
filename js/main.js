@@ -146,7 +146,8 @@ function loop(now) {
 function coverParams() {
   const cw = canvas.width, ch = canvas.height;
   const vw = video.videoWidth || 1280, vh = video.videoHeight || 720;
-  const scale = Math.max(cw / vw, ch / vh);
+  // "fit" (contain): show the whole camera frame — wider, no heavy zoom/crop.
+  const scale = Math.min(cw / vw, ch / vh);
   const dw = vw * scale, dh = vh * scale;
   return { cw, ch, dw, dh, dx: (cw - dw) / 2, dy: (ch - dh) / 2 };
 }
