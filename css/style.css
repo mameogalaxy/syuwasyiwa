@@ -196,6 +196,12 @@ html, body {
   box-shadow: 0 0 14px rgba(56,232,255,0.15), inset 0 1px 6px rgba(255,255,255,0.08);
 }
 .btn.round .ico { font-size: 24px; line-height: 1; }
+.btn.round.on {
+  color: #05070d;
+  background: var(--cyan);
+  border-color: var(--cyan);
+  box-shadow: 0 0 18px rgba(56,232,255,0.55), inset 0 1px 6px rgba(255,255,255,0.3);
+}
 
 /* ---- Mask selector strip ---- */
 .mask-strip {

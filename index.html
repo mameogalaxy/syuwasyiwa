@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
   <meta name="theme-color" content="#05070d" />
   <title>MECHA HENSHIN — インカメラAR変身</title>
-  <link rel="stylesheet" href="css/style.css?v=7" />
+  <link rel="stylesheet" href="css/style.css?v=8" />
 </head>
 <body>
   <div id="stage">
@@ -28,8 +28,14 @@
     <!-- Mask selector strip -->
     <div id="maskStrip" class="mask-strip" hidden></div>
 
+    <!-- hidden file picker for the image mask -->
+    <input id="imgInput" type="file" accept="image/*" hidden />
+
     <!-- Controls (kept OUTSIDE the mirrored canvas) -->
     <div class="controls">
+      <button id="mosaicBtn" class="btn round" type="button" disabled aria-label="顔モザイク">
+        <span class="ico">🟦</span>
+      </button>
       <button id="photoBtn" class="btn round" type="button" disabled aria-label="写真をとる">
         <span class="ico">📷</span>
       </button>
@@ -60,6 +66,6 @@
     </div>
   </div>
 
-  <script type="module" src="js/main.js?v=7"></script>
+  <script type="module" src="js/main.js?v=8"></script>
 </body>
 </html>

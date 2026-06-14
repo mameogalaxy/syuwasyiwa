@@ -11,7 +11,7 @@
 import {
   fly, shape, metal, strokePts, discU, sphere, ember, mirror, clamp01, trace,
   easeOutBack, easeOutExpo, FACE_OVAL,
-} from './gfx.js?v=7';
+} from './gfx.js?v=8';
 
 const L = strokePts;
 const both = (fn) => (ctx, F, p, env) => { fn(ctx, F, p, env, 1); fn(ctx, F, p, env, -1); };
@@ -612,5 +612,43 @@ const ANT = {
     { dur: 0.4, anchor: [0, 1.7], lock: { sound: 'heavy', shake: 7, burst: 14, both: true }, draw: antMandibles },
   ],
 };
+
+// ============================================================ IMAGE =========
+// Runtime mask from a user-supplied image, warped onto the face (clipped to the
+// face oval) and flown in like any other mask.
+export function makeImageMask(img) {
+  const draw = (ctx, F, p) => {
+    const e = easeOutBack(clamp01(p));
+    const sc = 0.55 + 0.45 * e;
+    ctx.save();
+    ctx.globalAlpha = clamp01(p * 1.4);
+    // map face-space -> screen (multiplies onto the current shake transform)
+    ctx.transform(F.s * F.xhat.x, F.s * F.xhat.y, F.s * F.yhat.x, F.s * F.yhat.y, F.mid.x, F.mid.y);
+    ctx.translate(0, 0.5); ctx.scale(sc, sc); ctx.translate(0, -0.5);
+    // clip to the face oval so the photo reads as a face mask
+    ctx.beginPath();
+    for (let i = 0; i < FACE_OVAL.length; i++) {
+      const [u, v] = FACE_OVAL[i];
+      if (i === 0) ctx.moveTo(u, v); else ctx.lineTo(u, v);
+    }
+    ctx.closePath();
+    ctx.clip();
+    // cover-fit the image into the face box, preserving aspect ratio
+    const bx = -1.32, by = -1.4, bw = 2.64, bh = 3.5;
+    const iw = img.naturalWidth || img.width || 1, ih = img.naturalHeight || img.height || 1;
+    const ar = iw / ih, boxAr = bw / bh;
+    let dw = bw, dh = bh, dx = bx, dy = by;
+    if (ar > boxAr) { dh = bh; dw = dh * ar; dx = bx + (bw - dw) / 2; }
+    else { dw = bw; dh = dw / ar; dy = by + (bh - dh) / 2; }
+    ctx.drawImage(img, dx, dy, dw, dh);
+    ctx.restore();
+  };
+  return {
+    id: 'image', name: '画像', emoji: '🖼️', finale: 'puff',
+    parts: [
+      { dur: 0.6, anchor: [0, 0.5], lock: { sound: 'heavy', shake: 9, burst: 18, flash: 0.18, both: true }, draw },
+    ],
+  };
+}
 
 export const MASKS = [MECHA, TENGU, OKAME, VAMPIRE, ZOMBIE, POOP, TREE, ANT];

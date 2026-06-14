@@ -1,10 +1,10 @@
 import { FilesetResolver, FaceLandmarker }
   from 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/vision_bundle.mjs';
-import { extractPoints, buildFrame } from './gfx.js?v=7';
-import { Transformer } from './transformer.js?v=7';
-import { MASKS } from './masks.js?v=7';
-import { Effects } from './effects.js?v=7';
-import * as sfx from './sound.js?v=7';
+import { extractPoints, buildFrame, FACE_OVAL } from './gfx.js?v=8';
+import { Transformer } from './transformer.js?v=8';
+import { MASKS, makeImageMask } from './masks.js?v=8';
+import { Effects } from './effects.js?v=8';
+import * as sfx from './sound.js?v=8';
 
 const VISION_WASM = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm';
 const MODEL = 'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task';
@@ -19,6 +19,8 @@ const startBtn = document.getElementById('startBtn');
 const henshinBtn = document.getElementById('henshinBtn');
 const resetBtn = document.getElementById('resetBtn');
 const photoBtn = document.getElementById('photoBtn');
+const mosaicBtn = document.getElementById('mosaicBtn');
+const imgInput = document.getElementById('imgInput');
 const statusEl = document.getElementById('status');
 const maskStrip = document.getElementById('maskStrip');
 const photoView = document.getElementById('photoView');
@@ -38,6 +40,8 @@ let sm = null;                 // EMA-smoothed key points
 const SMOOTH = 0.5;
 let pendingCapture = false;
 let photoBlob = null;
+let mosaic = false;
+let imageMask = null;          // runtime mask built from an uploaded image
 
 tf.setMask(MASKS[0]);
 tf.onStage = (name) => { if (name) setStatus(name); };
@@ -54,6 +58,7 @@ window.addEventListener('resize', resize);
 resize();
 
 // ---- mask selector ----------------------------------------------------------
+let imgChip = null;
 function buildMaskStrip() {
   maskStrip.innerHTML = '';
   MASKS.forEach((m, i) => {
@@ -64,13 +69,35 @@ function buildMaskStrip() {
     chip.addEventListener('click', () => selectMask(i));
     maskStrip.appendChild(chip);
   });
+  // extra chip: load your own image as a mask
+  imgChip = document.createElement('button');
+  imgChip.type = 'button';
+  imgChip.className = 'mask-chip';
+  imgChip.innerHTML = '<span class="em">🖼️</span><span class="nm">画像</span>';
+  imgChip.addEventListener('click', () => imgInput.click());
+  maskStrip.appendChild(imgChip);
+}
+function setActiveChip(el) {
+  [...maskStrip.children].forEach((c) => c.classList.toggle('active', c === el));
 }
 function selectMask(i) {
   sfx.unlock();
   tf.setMask(MASKS[i]);                 // resets any active transformation
-  [...maskStrip.children].forEach((c, k) => c.classList.toggle('active', k === i));
+  setActiveChip(maskStrip.children[i]);
   resetBtn.hidden = true;
   setStatus(landmarks ? `READY — ${MASKS[i].name}に変身` : '顔を画面に合わせてください');
+}
+function loadImageMask(file) {
+  const img = new Image();
+  img.onload = () => {
+    imageMask = makeImageMask(img);
+    tf.setMask(imageMask);
+    setActiveChip(imgChip);
+    resetBtn.hidden = true;
+    setStatus(landmarks ? 'READY — 画像マスクに変身' : '顔を画面に合わせてください');
+  };
+  img.onerror = () => setStatus('画像を読み込めませんでした');
+  img.src = URL.createObjectURL(file);
 }
 
 // ---- boot -------------------------------------------------------------------
@@ -107,6 +134,7 @@ async function boot() {
     maskStrip.hidden = false;
     henshinBtn.disabled = false;
     photoBtn.disabled = false;
+    mosaicBtn.disabled = false;
     setStatus('顔を画面に合わせてください');
     requestAnimationFrame(loop);
   } catch (err) {
@@ -184,6 +212,7 @@ function render() {
     ctx.restore();
   }
 
+  if (mosaic && F) pixelateFace(F);   // privacy: blur the real face under the mask
   if (F) tf.draw(ctx, F);
   fx.drawParticles(ctx);
   ctx.restore(); // end shake
@@ -207,6 +236,44 @@ function render() {
 
   if (!tf.active && !resetBtn.hidden) resetBtn.hidden = true;
   henshinBtn.disabled = tf.isReleasing;
+}
+
+// ---- face mosaic (privacy) --------------------------------------------------
+const mtmp = document.createElement('canvas');
+const mctx = mtmp.getContext('2d');
+function pixelateFace(F) {
+  // screen-space bounding box of the face oval (head may be rotated)
+  const probe = [[-1.25, -1.4], [1.25, -1.4], [1.35, 0.5], [-1.35, 0.5], [1.3, 2.15], [-1.3, 2.15]];
+  let minx = 1e9, miny = 1e9, maxx = -1e9, maxy = -1e9;
+  for (const [u, v] of probe) {
+    const q = F.to(u, v);
+    if (q.x < minx) minx = q.x; if (q.x > maxx) maxx = q.x;
+    if (q.y < miny) miny = q.y; if (q.y > maxy) maxy = q.y;
+  }
+  minx = Math.max(0, minx); miny = Math.max(0, miny);
+  maxx = Math.min(canvas.width, maxx); maxy = Math.min(canvas.height, maxy);
+  const bw = maxx - minx, bh = maxy - miny;
+  if (bw <= 4 || bh <= 4) return;
+
+  const block = Math.max(6, F.s * 0.16);
+  const sw = Math.max(1, Math.round(bw / block)), sh = Math.max(1, Math.round(bh / block));
+  mtmp.width = sw; mtmp.height = sh;
+  mctx.imageSmoothingEnabled = false;
+  mctx.clearRect(0, 0, sw, sh);
+  mctx.drawImage(canvas, minx, miny, bw, bh, 0, 0, sw, sh);
+
+  ctx.save();
+  ctx.beginPath();
+  for (let i = 0; i < FACE_OVAL.length; i++) {
+    const q = F.to(FACE_OVAL[i][0], FACE_OVAL[i][1]);
+    if (i === 0) ctx.moveTo(q.x, q.y); else ctx.lineTo(q.x, q.y);
+  }
+  ctx.closePath();
+  ctx.clip();
+  ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(mtmp, 0, 0, sw, sh, minx, miny, bw, bh);
+  ctx.imageSmoothingEnabled = true;
+  ctx.restore();
 }
 
 // ---- photo ------------------------------------------------------------------
@@ -250,3 +317,12 @@ resetBtn.addEventListener('click', () => tf.disengage());
 photoBtn.addEventListener('click', takePhoto);
 photoSave.addEventListener('click', savePhoto);
 photoClose.addEventListener('click', () => { photoView.hidden = true; });
+mosaicBtn.addEventListener('click', () => {
+  mosaic = !mosaic;
+  mosaicBtn.classList.toggle('on', mosaic);
+});
+imgInput.addEventListener('change', () => {
+  const file = imgInput.files && imgInput.files[0];
+  if (file) loadImageMask(file);
+  imgInput.value = '';
+});
