@@ -271,6 +271,24 @@ export function hudBoot() {
   });
 }
 
+// Camera shutter for photo capture.
+export function shutter() {
+  const c = ac(); if (!c) return;
+  const t = c.currentTime;
+  for (const dt of [0, 0.08]) {
+    const src = c.createBufferSource();
+    src.buffer = noiseBuffer(c, 0.05);
+    const bp = c.createBiquadFilter();
+    bp.type = 'bandpass'; bp.frequency.value = 3000; bp.Q.value = 2;
+    const g = c.createGain();
+    g.gain.setValueAtTime(0.0001, t + dt);
+    g.gain.exponentialRampToValueAtTime(0.35, t + dt + 0.004);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dt + 0.05);
+    src.connect(bp).connect(g).connect(c.destination);
+    src.start(t + dt); src.stop(t + dt + 0.06);
+  }
+}
+
 // Soft reset / disengage sound.
 export function powerDown(duration = 0.5) {
   const c = ac(); if (!c) return;

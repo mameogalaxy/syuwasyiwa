@@ -25,13 +25,30 @@
     <!-- Status readouts -->
     <div id="status" class="status">起動中…</div>
 
+    <!-- Mask selector strip -->
+    <div id="maskStrip" class="mask-strip" hidden></div>
+
     <!-- Controls (kept OUTSIDE the mirrored canvas) -->
     <div class="controls">
-      <button id="resetBtn" class="btn ghost" type="button" hidden>解除</button>
+      <button id="photoBtn" class="btn round" type="button" disabled aria-label="写真をとる">
+        <span class="ico">📷</span>
+      </button>
       <button id="henshinBtn" class="btn primary" type="button" disabled>
         <span class="btn-label">変身</span>
         <span class="btn-sub">HENSHIN</span>
       </button>
+      <button id="resetBtn" class="btn round" type="button" hidden aria-label="解除">
+        <span class="ico">✖</span>
+      </button>
+    </div>
+
+    <!-- Photo preview overlay -->
+    <div id="photoView" class="photo-view" hidden>
+      <img id="photoImg" alt="撮影した写真" />
+      <div class="photo-actions">
+        <button id="photoSave" class="btn ghost" type="button">保存 / 共有</button>
+        <button id="photoClose" class="btn ghost" type="button">閉じる</button>
+      </div>
     </div>
 
     <!-- Boot / error gate -->

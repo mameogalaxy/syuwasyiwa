@@ -1,6 +1,8 @@
 import { FilesetResolver, FaceLandmarker }
   from 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/vision_bundle.mjs';
-import { extractPoints, buildFrame, Armor } from './armor.js';
+import { extractPoints, buildFrame } from './gfx.js';
+import { Transformer } from './transformer.js';
+import { MASKS } from './masks.js';
 import { Effects } from './effects.js';
 import * as sfx from './sound.js';
 
@@ -16,22 +18,29 @@ const gateMsg = document.getElementById('gateMsg');
 const startBtn = document.getElementById('startBtn');
 const henshinBtn = document.getElementById('henshinBtn');
 const resetBtn = document.getElementById('resetBtn');
+const photoBtn = document.getElementById('photoBtn');
 const statusEl = document.getElementById('status');
+const maskStrip = document.getElementById('maskStrip');
+const photoView = document.getElementById('photoView');
+const photoImg = document.getElementById('photoImg');
+const photoSave = document.getElementById('photoSave');
+const photoClose = document.getElementById('photoClose');
 
 const fx = new Effects();
-const armor = new Armor(fx);
+const tf = new Transformer(fx);
 let faceLandmarker = null;
 let lastVideoTime = -1;
 let landmarks = null;
 let dpr = Math.min(window.devicePixelRatio || 1, 2);
 let lastFrame = performance.now();
 let faceSeen = false;
-
-// EMA-smoothed key points (screen px) to kill detector jitter
-let sm = null;
+let sm = null;                 // EMA-smoothed key points
 const SMOOTH = 0.5;
+let pendingCapture = false;
+let photoBlob = null;
 
-armor.onStage = (name) => { if (name) setStatus(name); };
+tf.setMask(MASKS[0]);
+tf.onStage = (name) => { if (name) setStatus(name); };
 const setStatus = (text) => { statusEl.textContent = text; };
 
 function resize() {
@@ -44,7 +53,27 @@ function resize() {
 window.addEventListener('resize', resize);
 resize();
 
-// ---- boot -----------------------------------------------------------------
+// ---- mask selector ----------------------------------------------------------
+function buildMaskStrip() {
+  maskStrip.innerHTML = '';
+  MASKS.forEach((m, i) => {
+    const chip = document.createElement('button');
+    chip.type = 'button';
+    chip.className = 'mask-chip' + (i === 0 ? ' active' : '');
+    chip.innerHTML = `<span class="em">${m.emoji}</span><span class="nm">${m.name}</span>`;
+    chip.addEventListener('click', () => selectMask(i));
+    maskStrip.appendChild(chip);
+  });
+}
+function selectMask(i) {
+  sfx.unlock();
+  tf.setMask(MASKS[i]);                 // resets any active transformation
+  [...maskStrip.children].forEach((c, k) => c.classList.toggle('active', k === i));
+  resetBtn.hidden = true;
+  setStatus(landmarks ? `READY — ${MASKS[i].name}に変身` : '顔を画面に合わせてください');
+}
+
+// ---- boot -------------------------------------------------------------------
 async function boot() {
   startBtn.disabled = true;
   gateMsg.classList.remove('error');
@@ -66,7 +95,10 @@ async function boot() {
     });
 
     gate.classList.add('hidden');
+    buildMaskStrip();
+    maskStrip.hidden = false;
     henshinBtn.disabled = false;
+    photoBtn.disabled = false;
     setStatus('顔を画面に合わせてください');
     requestAnimationFrame(loop);
   } catch (err) {
@@ -86,7 +118,7 @@ function describeError(err) {
   return '起動に失敗しました：' + (err && err.message ? err.message : err);
 }
 
-// ---- render loop ----------------------------------------------------------
+// ---- render loop ------------------------------------------------------------
 function loop(now) {
   const dt = Math.min(0.05, (now - lastFrame) / 1000);
   lastFrame = now;
@@ -97,13 +129,12 @@ function loop(now) {
     landmarks = res && res.faceLandmarks && res.faceLandmarks[0] ? res.faceLandmarks[0] : null;
   }
 
-  armor.update(dt);
-  fx.update(dt, armor.power);
+  tf.update(dt);
+  fx.update(dt, tf.power);
   render();
   requestAnimationFrame(loop);
 }
 
-// cover-fit transform from normalised video coords -> mirrored canvas px
 function coverParams() {
   const cw = canvas.width, ch = canvas.height;
   const vw = video.videoWidth || 1280, vh = video.videoHeight || 720;
@@ -117,7 +148,6 @@ function render() {
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.clearRect(0, 0, cw, ch);
 
-  // build a smoothed face frame
   let F = null;
   if (landmarks) {
     const map = (i) => {
@@ -133,7 +163,6 @@ function render() {
     sm = null;
   }
 
-  // camera shake offset applied to the camera + armour layer
   const sh = fx.shakeOffset();
   ctx.save();
   ctx.translate(sh.x, sh.y);
@@ -146,38 +175,69 @@ function render() {
     ctx.restore();
   }
 
-  if (F) armor.draw(ctx, F);
+  if (F) tf.draw(ctx, F);
   fx.drawParticles(ctx);
   ctx.restore(); // end shake
 
-  // full-screen flash, then HUD (stable, not shaken)
-  fx.drawFlash(ctx, cw, ch);
-  if (F) fx.drawHud(ctx, F, armor.power, cw, ch);
+  if (F && tf.mask && tf.mask.hud) fx.drawHud(ctx, F, tf.power, cw, ch);
 
-  // status hints
+  // capture a clean composite BEFORE the bright flash overlay
+  if (pendingCapture) {
+    pendingCapture = false;
+    canvas.toBlob((blob) => { if (blob) showPhoto(blob); }, 'image/png');
+  }
+
+  fx.drawFlash(ctx, cw, ch);
+
   if (landmarks) {
-    if (!faceSeen) { faceSeen = true; if (!armor.active) setStatus('READY — 変身ボタンを押せ'); }
-  } else if (!armor.active) {
+    if (!faceSeen) { faceSeen = true; if (!tf.active) setStatus(`READY — ${tf.mask.name}に変身`); }
+  } else if (!tf.active) {
     faceSeen = false;
     setStatus('顔を画面に合わせてください');
   }
 
-  // hide the disengage button once the suit is fully released
-  if (!armor.active && !resetBtn.hidden) resetBtn.hidden = true;
-  henshinBtn.disabled = armor.isReleasing;
+  if (!tf.active && !resetBtn.hidden) resetBtn.hidden = true;
+  henshinBtn.disabled = tf.isReleasing;
 }
 
-// ---- UI -------------------------------------------------------------------
-startBtn.addEventListener('click', () => { sfx.unlock(); boot(); });
+// ---- photo ------------------------------------------------------------------
+function takePhoto() {
+  sfx.unlock();
+  sfx.shutter();
+  fx.doFlash(0.6, '255,255,255');
+  pendingCapture = true;
+}
 
+function showPhoto(blob) {
+  if (photoBlob) URL.revokeObjectURL(photoImg.src);
+  photoBlob = blob;
+  photoImg.src = URL.createObjectURL(blob);
+  photoView.hidden = false;
+}
+
+async function savePhoto() {
+  if (!photoBlob) return;
+  const file = new File([photoBlob], `henshin_${Date.now()}.png`, { type: 'image/png' });
+  if (navigator.canShare && navigator.canShare({ files: [file] })) {
+    try { await navigator.share({ files: [file], title: 'AR変身カメラ' }); return; }
+    catch (e) { /* fall through to download */ }
+  }
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(photoBlob);
+  a.download = file.name;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+}
+
+// ---- UI ---------------------------------------------------------------------
+startBtn.addEventListener('click', () => { sfx.unlock(); boot(); });
 henshinBtn.addEventListener('click', () => {
   sfx.unlock();
-  if (armor.isComplete) return;
-  armor.start();
+  if (tf.isComplete) return;
+  tf.start();
   resetBtn.hidden = false;
 });
-
-resetBtn.addEventListener('click', () => {
-  // play the cinematic disengage; the button hides itself once released
-  armor.disengage();
-});
+resetBtn.addEventListener('click', () => tf.disengage());
+photoBtn.addEventListener('click', takePhoto);
+photoSave.addEventListener('click', savePhoto);
+photoClose.addEventListener('click', () => { photoView.hidden = true; });

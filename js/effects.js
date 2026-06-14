@@ -74,8 +74,8 @@ export class Effects {
       if (q.life <= 0) p.splice(i, 1);
     }
 
-    // ambient HUD motes once the suit is online
-    if (power > 0.4) {
+    // ambient HUD motes once the suit is online (needs known canvas size)
+    if (power > 0.4 && this._w) {
       this.ambientTimer -= dt;
       if (this.ambientTimer <= 0 && p.length < this.MAX) {
         this.ambientTimer = rand(0.08, 0.2);
