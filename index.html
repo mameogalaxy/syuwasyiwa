@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="theme-color" content="#05070d" />
+  <title>MECHA HENSHIN — インカメラAR変身</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <div id="stage">
+    <!-- Mirrored camera + AR overlay live on one canvas for perfect alignment -->
+    <canvas id="view"></canvas>
+    <video id="cam" playsinline autoplay muted></video>
+
+    <!-- HUD frame -->
+    <div class="hud" aria-hidden="true">
+      <span class="corner tl"></span>
+      <span class="corner tr"></span>
+      <span class="corner bl"></span>
+      <span class="corner br"></span>
+      <div class="scanline"></div>
+    </div>
+
+    <!-- Status readouts -->
+    <div id="status" class="status">起動中…</div>
+
+    <!-- Controls (kept OUTSIDE the mirrored canvas) -->
+    <div class="controls">
+      <button id="resetBtn" class="btn ghost" type="button" hidden>解除</button>
+      <button id="henshinBtn" class="btn primary" type="button" disabled>
+        <span class="btn-label">変身</span>
+        <span class="btn-sub">HENSHIN</span>
+      </button>
+    </div>
+
+    <!-- Boot / error gate -->
+    <div id="gate" class="gate">
+      <div class="gate-card">
+        <h1>MECHA&nbsp;HENSHIN</h1>
+        <p>インカメラを起動して、ボタンひとつでメカパーツを顔に装着。<br />フルフェイスマスクが合体・完成します。</p>
+        <button id="startBtn" class="btn primary big" type="button">カメラを起動</button>
+        <p id="gateMsg" class="gate-msg"></p>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
