@@ -1,10 +1,10 @@
 import { FilesetResolver, FaceLandmarker }
   from 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/vision_bundle.mjs';
-import { extractPoints, buildFrame } from './gfx.js?v=6';
-import { Transformer } from './transformer.js?v=6';
-import { MASKS } from './masks.js?v=6';
-import { Effects } from './effects.js?v=6';
-import * as sfx from './sound.js?v=6';
+import { extractPoints, buildFrame } from './gfx.js?v=7';
+import { Transformer } from './transformer.js?v=7';
+import { MASKS } from './masks.js?v=7';
+import { Effects } from './effects.js?v=7';
+import * as sfx from './sound.js?v=7';
 
 const VISION_WASM = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/wasm';
 const MODEL = 'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task';
