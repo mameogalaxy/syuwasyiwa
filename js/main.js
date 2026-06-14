@@ -79,9 +79,17 @@ async function boot() {
   gateMsg.classList.remove('error');
   try {
     gateMsg.textContent = 'カメラを準備中…';
+    // Request a stream that matches the screen's orientation so the selfie view
+    // isn't heavily cropped/zoomed (front cameras default to landscape).
+    const portrait = window.innerHeight >= window.innerWidth;
     const stream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } },
       audio: false,
+      video: {
+        facingMode: 'user',
+        width: { ideal: portrait ? 720 : 1280 },
+        height: { ideal: portrait ? 1280 : 720 },
+        aspectRatio: { ideal: window.innerWidth / window.innerHeight },
+      },
     });
     video.srcObject = stream;
     await video.play();
