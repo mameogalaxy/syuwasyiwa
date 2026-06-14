@@ -1,8 +1,8 @@
 // Generic transformation engine: runs a mask's parts through a staged
 // assemble -> hold -> disassemble sequence, firing effects + sound.
 
-import * as sfx from './sound.js';
-import { clamp01, easeInCubic } from './gfx.js';
+import * as sfx from './sound.js?v=6';
+import { clamp01, easeInCubic } from './gfx.js?v=6';
 
 const REL_LEAD = 0.26, REL_STAGGER = 0.15, REL_PART = 0.5;
 

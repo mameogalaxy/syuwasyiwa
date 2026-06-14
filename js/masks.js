@@ -9,9 +9,9 @@
 // mask = { id, name, emoji, intro?, glow?, hud?, finale?, parts:[...] }
 
 import {
-  fly, shape, metal, strokePts, discU, ember, mirror, clamp01, trace,
+  fly, shape, metal, strokePts, discU, sphere, ember, mirror, clamp01, trace,
   easeOutBack, easeOutExpo, FACE_OVAL,
-} from './gfx.js';
+} from './gfx.js?v=6';
 
 const L = strokePts;
 const both = (fn) => (ctx, F, p, env) => { fn(ctx, F, p, env, 1); fn(ctx, F, p, env, -1); };
@@ -116,15 +116,17 @@ const MECHA = {
 // ============================================================ TENGU =========
 function skin(ctx, F, p, env, cols, extra) {
   const xf = fly(F, p, { fromScale: 0.5, pivot: [0, 0.5] });
-  shape(ctx, F, xf, FACE_OVAL, Object.assign({ c0: cols[0], c1: cols[1], c2: cols[2], outline: cols[3] || 'rgba(0,0,0,0.5)', top: -1.2, bot: 2.0 }, extra || {}));
+  shape(ctx, F, xf, FACE_OVAL, Object.assign({
+    c0: cols[0], c1: cols[1], c2: cols[2], outline: cols[3] || 'rgba(0,0,0,0.5)',
+    top: -1.2, bot: 2.0, spec: [-0.4, -0.35], specR: 0.7, hi: 0.3,
+  }, extra || {}));
   return xf;
 }
 function tenguFace(ctx, F, p, env) { skin(ctx, F, p, env, ['#7a0f0f', '#c12626', '#e85a4a']); }
 function tenguNose(ctx, F, p, env) {
   const xf = fly(F, p, { fromV: -0.6, fromScale: 0.4, pivot: [0, 0.3] });
   shape(ctx, F, xf, [[-0.2, 0.0], [0.2, 0.0], [0.26, 0.5], [0.16, 1.2], [0, 1.55], [-0.16, 1.2], [-0.26, 0.5]],
-    { c0: '#8a1414', c1: '#d83a2c', c2: '#ff7a5e', top: -0.1, bot: 1.6 });
-  ember(ctx, xf, F, 0, 0.4, '#ff9a7a', 0.25, 0.18);
+    { c0: '#8a1414', c1: '#d83a2c', c2: '#ff7a5e', top: -0.1, bot: 1.6, spec: [-0.06, 0.4], specR: 0.22, hi: 0.34 });
 }
 function tenguBrows(ctx, F, p, env) {
   const xf = fly(F, p, { fromV: -1.4, fromScale: 0.7, pivot: [0, -0.3] });
@@ -289,7 +291,10 @@ function poopTier(ctx, F, cx, cy, rx, ry, p, fromV) {
     const a = (i / n) * Math.PI * 2;
     pts.push([cx + Math.cos(a) * rx, cy + Math.sin(a) * ry]);
   }
-  shape(ctx, F, xf, pts, { c0: '#5b3416', c1: '#8a5424', c2: '#c08743', outline: 'rgba(50,28,10,0.6)', top: cy - ry, bot: cy + ry });
+  shape(ctx, F, xf, pts, {
+    c0: '#4a2911', c1: '#8a5424', c2: '#cf924f', outline: 'rgba(50,28,10,0.6)',
+    top: cy - ry, bot: cy + ry, spec: [cx - rx * 0.32, cy - ry * 0.42], specR: rx * 0.5, hi: 0.32,
+  });
 }
 const POOP = {
   id: 'poop', name: 'うんこ', emoji: '💩', finale: 'puff',
@@ -301,7 +306,7 @@ const POOP = {
       dur: 0.4, anchor: [0, -1.0], lock: { sound: 'click', shake: 5 }, draw: (ctx, F, p) => {
         const xf = fly(F, p, { fromV: -1.5, fromScale: 0.3, pivot: [0, -0.7] });
         shape(ctx, F, xf, [[-0.4, -0.5], [0.4, -0.5], [0.22, -1.0], [0, -1.5], [-0.22, -1.0]],
-          { c0: '#5b3416', c1: '#8a5424', c2: '#c08743', outline: 'rgba(50,28,10,0.6)', top: -1.5, bot: -0.5 });
+          { c0: '#4a2911', c1: '#8a5424', c2: '#cf924f', outline: 'rgba(50,28,10,0.6)', top: -1.5, bot: -0.5, spec: [-0.12, -0.9], specR: 0.3, hi: 0.34 });
       },
     },
     {
@@ -374,10 +379,7 @@ function antAntennae(ctx, F, p, env) {
 }
 function antEyes(ctx, F, p, env) {
   const xf = fly(F, p, { fromScale: 0.2 });
-  for (const s of [1, -1]) {
-    discU(ctx, F, xf, 0.6 * s, 0.0, 0.34, [[0, '#3a3a44'], [0.5, '#15151b'], [1, '#000']], 'rgba(0,0,0,0.6)');
-    ember(ctx, xf, F, 0.5 * s, -0.12, '#ffffff', 0.5, 0.05);
-  }
+  for (const s of [1, -1]) sphere(ctx, F, xf, 0.6 * s, 0.0, 0.34, '#0e0e16', '#5c5c70', 'rgba(0,0,0,0.6)');
 }
 function antMandibles(ctx, F, p, env) {
   const xf = fly(F, p, { fromV: 0.8, fromScale: 0.5, pivot: [0, 1.4] });

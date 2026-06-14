@@ -111,27 +111,69 @@ function dropShadow(ctx, F, xf, pts, fill) {
 //       rivets, gloss, shadow}
 export function shape(ctx, F, xf, pts, o = {}) {
   const W = ctx.canvas.width, H = ctx.canvas.height;
-  if (o.shadow !== false) dropShadow(ctx, F, xf, pts, '#000');
+
+  // lifted drop shadow for separation between stacked parts
+  if (o.shadow !== false) {
+    ctx.save();
+    trace(ctx, xf, pts);
+    ctx.shadowColor = 'rgba(0,0,0,0.55)';
+    ctx.shadowBlur = F.s * (o.shadowBlur ?? 0.24);
+    ctx.shadowOffsetX = F.s * 0.03; ctx.shadowOffsetY = F.s * 0.08;
+    ctx.fillStyle = '#000';
+    ctx.fill();
+    ctx.restore();
+  }
 
   const a = xf(-1.2, 0), b = xf(1.2, 0);
   const g = ctx.createLinearGradient(a.x, a.y, b.x, b.y);
   const c0 = o.c0 || '#222', c1 = o.c1 || '#555', c2 = o.c2 || '#999';
-  g.addColorStop(0.0, c0); g.addColorStop(0.3, c1);
-  g.addColorStop(0.55, c2); g.addColorStop(0.8, c1); g.addColorStop(1, c0);
+  g.addColorStop(0.0, c0); g.addColorStop(0.32, c1);
+  g.addColorStop(0.55, c2); g.addColorStop(0.78, c1); g.addColorStop(1, c0);
 
   ctx.save();
   trace(ctx, xf, pts);
   ctx.fillStyle = o.fill || g;
   ctx.fill();
   ctx.clip();
+
   if (o.gloss !== false) {
+    // bounding box of the shape on screen
+    let mnx = 1e9, mny = 1e9, mxx = -1e9, mxy = -1e9;
+    for (const pt of pts) {
+      const p = xf(pt[0], pt[1]);
+      if (p.x < mnx) mnx = p.x; if (p.x > mxx) mxx = p.x;
+      if (p.y < mny) mny = p.y; if (p.y > mxy) mxy = p.y;
+    }
+    const bw = mxx - mnx, bh = mxy - mny;
+    // light comes from upper-left: offset the highlight centre there
+    const cx = mnx + bw * (o.lightU ?? 0.4), cy = mny + bh * (o.lightV ?? 0.34);
+    const rad = Math.max(bw, bh) * 0.66;
+
+    // radial form light: bright core -> neutral -> dark rim (occlusion = volume)
+    const rg = ctx.createRadialGradient(cx, cy, rad * 0.06, cx, cy, rad);
+    rg.addColorStop(0, `rgba(255,255,255,${o.hi ?? 0.26})`);
+    rg.addColorStop(0.42, 'rgba(255,255,255,0.05)');
+    rg.addColorStop(0.78, 'rgba(0,0,0,0.16)');
+    rg.addColorStop(1, 'rgba(0,0,0,0.5)');
+    ctx.fillStyle = rg; ctx.fillRect(0, 0, W, H);
+
+    // gentle directional sheen on top
     const t = xf(0, o.top ?? -1.4), c = xf(0, o.bot ?? 2.1);
     const sg = ctx.createLinearGradient(t.x, t.y, c.x, c.y);
-    sg.addColorStop(0, 'rgba(255,255,255,0.35)');
-    sg.addColorStop(0.22, 'rgba(255,255,255,0.08)');
-    sg.addColorStop(0.6, 'rgba(0,0,0,0)');
-    sg.addColorStop(1, 'rgba(0,0,0,0.32)');
+    sg.addColorStop(0, 'rgba(255,255,255,0.16)');
+    sg.addColorStop(0.3, 'rgba(255,255,255,0)');
+    sg.addColorStop(1, 'rgba(0,0,0,0.2)');
     ctx.fillStyle = sg; ctx.fillRect(0, 0, W, H);
+
+    // tight specular hotspot
+    if (o.spec) {
+      const sp = xf(o.spec[0], o.spec[1]); const sr = (o.specR ?? 0.32) * F.s;
+      const sg2 = ctx.createRadialGradient(sp.x, sp.y, 1, sp.x, sp.y, sr);
+      sg2.addColorStop(0, 'rgba(255,255,255,0.55)');
+      sg2.addColorStop(0.6, 'rgba(255,255,255,0.12)');
+      sg2.addColorStop(1, 'rgba(255,255,255,0)');
+      ctx.fillStyle = sg2; ctx.fillRect(0, 0, W, H);
+    }
   }
   ctx.restore();
 
@@ -142,6 +184,23 @@ export function shape(ctx, F, xf, pts, o = {}) {
   if (o.glow) for (const gl of o.glow)
     strokePts(ctx, F, xf, gl.pts, gl.color || '#fff', gl.w || 0.02, (o.power ?? 0) * (gl.k ?? 1), gl.closed);
   if (o.rivets) for (const r of o.rivets) rivet(ctx, xf, F, r[0], r[1]);
+}
+
+// A shaded sphere — for rounded features (eyes, cheeks, noses, berries…).
+export function sphere(ctx, F, xf, u, v, rUnits, baseDark, baseLight, outline) {
+  const p = xf(u, v), r = rUnits * F.s;
+  const g = ctx.createRadialGradient(p.x - r * 0.35, p.y - r * 0.4, r * 0.05, p.x, p.y, r);
+  g.addColorStop(0, baseLight);
+  g.addColorStop(0.55, baseDark);
+  g.addColorStop(1, 'rgba(0,0,0,0.55)');
+  ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
+  ctx.fillStyle = g; ctx.fill();
+  if (outline) { ctx.lineWidth = Math.max(1, F.s * 0.014); ctx.strokeStyle = outline; ctx.stroke(); }
+  // crisp specular dot
+  ctx.beginPath();
+  ctx.arc(p.x - r * 0.34, p.y - r * 0.4, r * 0.16, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(255,255,255,0.85)';
+  ctx.fill();
 }
 
 // Brushed-metal panel (for the mecha mask).
